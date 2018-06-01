@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Merlindomx Web CI Pipeline Stack v1.2.0 '
+Parameters:
+  VpcStackName:
+    Description: VPC Stack Name.
+    Type: String
+    Default: MerlindomxTestVPC
+  IAMStackName:
+    Description: IAM Stack Name.
+    Type: String
+    Default: MerlindomxIAM
+  DevelopmentStackName:
+    Description: Development Stack Name.
+    Type: String
+    Default: MerlindomxDevelopment
+  DBStackName:
+    Description: DB Stack Name.
+    Type: String
+    Default: MerlindomxDB
+Mappings: {}
+Metadata: {}
+Conditions: {}
+Resources:
+  MerlindomxWebCi:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      RoleArn: !ImportValue
+        'Fn::Sub': '${IAMStackName}-MerlindomxCodePipelineRoleArn'
+      Name: MerlindomxWebCiPipeline
+      Stages:
+        - Name: Source
+          Actions:
+            - InputArtifacts: []
+              Name: WebSourceS3
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: '1'
+                Provider: S3
+              OutputArtifacts:
+                - Name: Merlindomxweb_artefact
+              Configuration:
+                S3Bucket: Merlindomx-stratalux-beanstalk
+                PollForSourceChanges: 'true'
+                S3ObjectKey: Merlindomxwebsite.zip
+              RunOrder: 1
+            - InputArtifacts: []
+              Name: WebTemplateSourceS3
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: '1'
+                Provider: S3
+              OutputArtifacts:
+                - Name: web_cf_template
+              Configuration:
+                S3Bucket: Merlindomx-stratalux-beanstalk
+                PollForSourceChanges: 'true'
+                S3ObjectKey: cloudformation/Merlindomxwebtestcf.zip
+              RunOrder: 1
+        - Name: DeployMerlindomxWebForTesting
+          Actions:
+            - InputArtifacts:
+                - Name: Merlindomxweb_artefact
+                - Name: web_cf_template
+              Name: MerlindomxWebCiTest
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              OutputArtifacts: []
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                Capabilities: CAPABILITY_IAM
+                StackName: MerlindomxWebCiTest
+                TemplateConfiguration: 'web_cf_template::Merlindomx_web_config.json'
+                TemplatePath: 'web_cf_template::Merlindomx_web_test.json'
+              RunOrder: 1
+        - Name: TestMerlindomxWeb
+          Actions:
+            - InputArtifacts: []
+              Name: TestMerlindomxWeb
+              ActionTypeId:
+                Category: Invoke
+                Owner: AWS
+                Version: '1'
+                Provider: Lambda
+              OutputArtifacts: []
+              Configuration:
+                FunctionName: MerlindomxWebTest
+                UserParameters: 'https://Merlindomxwebtest.Merlindomxtest.it'
+              RunOrder: 1
+        - Name: ArchiveForCDStack
+          Actions:
+            - InputArtifacts: []
+              Name: LambdaForCDStackPrep
+              ActionTypeId:
+                Category: Invoke
+                Owner: AWS
+                Version: '1'
+                Provider: Lambda
+              OutputArtifacts: []
+              Configuration:
+                FunctionName: MerlindomxCreateCFParameters
+                UserParameters: 'https://Merlindomxwebtest.Merlindomxtest.it'
+              RunOrder: 1
+        - Name: DestroyMerlindomxTestWebCi
+          Actions:
+            - InputArtifacts: []
+              Name: DestroyMerlindomxWebCiTest
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              OutputArtifacts: []
+              Configuration:
+                StackName: MerlindomxWebCiTest
+                ActionMode: DELETE_ONLY
+              RunOrder: 1
+      ArtifactStore:
+        Type: S3
+        Location: Merlindomx-stratalux-beanstalk
+      DisableInboundStageTransitions:
+        - StageName: DestroyMerlindomxTestWebCi
+          Reason: Disabling the transition until integration tests are completed

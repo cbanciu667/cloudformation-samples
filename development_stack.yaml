@@ -1,0 +1,185 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Merlindomx Development Stack v1.2.0
+Parameters:
+  VpcStackName:
+    Description: VPC Stack Name.
+    Type: String
+    Default: MerlindomxTestVPC
+  IAMStackName:
+    Description: IAM Stack Name
+    Type: String
+    Default: MerlindomxIAM
+  DevInstanceType:
+    Description: Development EC2 instance type
+    Type: String
+    AllowedValues:
+      - t2.small
+      - t2.medium
+      - t2.large
+    ConstraintDescription: must be a valid EC2 instance type.
+    Default: t2.medium
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to instances
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair.
+  EFSPerformanceMode:
+    Description: EFS Performance mode
+    Type: String
+    Default: generalPurpose
+Mappings:
+  Region2Index:
+    eu-west-1:
+      REGION: '0'
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: General Stack Settings
+        Parameters:
+          - VpcStackName
+          - IAMStackName
+          - EFSPerformanceMode
+      - Label:
+          default: Development instance configuration
+        Parameters:
+          - DevInstanceType
+          - KeyName
+    ParameterLabels:
+      VPCID:
+        default: Inputs for Development layer stack creation
+Conditions: {}
+Resources:
+  DevFileSystem:
+    Type: 'AWS::EFS::FileSystem'
+    Properties:
+      PerformanceMode: !Ref EFSPerformanceMode
+      FileSystemTags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - Merlindomxdevelopment
+              - fs
+  MountTarget:
+    Type: 'AWS::EFS::MountTarget'
+    Properties:
+      FileSystemId: !Ref DevFileSystem
+      SubnetId: !ImportValue
+        'Fn::Sub': '${VpcStackName}-PublicSubnet1B'
+      SecurityGroups:
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-common'
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-env'
+        - !Ref MerlindomxDevSG
+  MerlindomxWebRepo:
+    Type: 'AWS::CodeCommit::Repository'
+    Properties:
+      RepositoryName: MerlindomxWebRepo
+      RepositoryDescription: Repo for Merlindomx web
+  MerlindomxIngesterRepo:
+    Type: 'AWS::CodeCommit::Repository'
+    Properties:
+      RepositoryName: MerlindomxIngesterRepo
+      RepositoryDescription: Repo for ingester app
+  MerlindomxS3BucketChef:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      AccessControl: Private
+      BucketName: Merlindomx-stratalux-chef
+  MerlindomxS3BucketBeanstalk:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      AccessControl: Private
+      BucketName: Merlindomx-stratalux-beanstalk
+  MerlindomxS3BucketCodedeploy:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      AccessControl: Private
+      BucketName: Merlindomx-stratalux-codedeploy
+  MerlindomxDevIP:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      InstanceId: !Ref MerlindomxDevInstance
+      Domain: vpc
+  MerlindomxDevSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Merlindomx Dev Machine
+      VpcId: !ImportValue
+        'Fn::Sub': '${VpcStackName}-VPC'
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref VpcStackName
+              - MerlindomxDevInstance
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '3389'
+          ToPort: '3389'
+          CidrIp: 86.125.101.106/32
+        - IpProtocol: '-1'
+          FromPort: '0'
+          ToPort: '65535'
+          SourceSecurityGroupId: !ImportValue
+            'Fn::Sub': '${VpcStackName}-common'
+  MerlindomxDevInstance:
+    Type: 'AWS::EC2::Instance'
+    DeletionPolicy: Retain
+    Properties:
+      InstanceType: !Ref DevInstanceType
+      IamInstanceProfile: !ImportValue
+        'Fn::Sub': '${IAMStackName}-MerlindomxInstanceProfile'
+      KeyName: !Ref KeyName
+      ImageId: ami-831a07f9
+      SubnetId: !ImportValue
+        'Fn::Sub': '${VpcStackName}-PublicSubnet1B'
+      SecurityGroupIds:
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-common'
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-env'
+        - !Ref MerlindomxDevSG
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - Merlindomxdev
+              - .
+              - !ImportValue
+                'Fn::Sub': '${VpcStackName}-DNSDomain'
+        - Key: 'stlx:project'
+          Value: !ImportValue
+            'Fn::Sub': '${VpcStackName}-ProjectTag'
+Outputs:
+  MerlindomxS3EndpointChef:
+    Description: Merlindomx S3 Endpoint for Chef
+    Value: !GetAtt
+      - MerlindomxS3BucketChef
+      - DomainName
+    Export:
+      Name: !Sub '${AWS::StackName}-MerlindomxS3EndpointChef'
+  MerlindomxS3EndpointBeanstalk:
+    Description: Merlindomx S3 Endpoint for Beanstalk
+    Value: !GetAtt
+      - MerlindomxS3BucketBeanstalk
+      - DomainName
+    Export:
+      Name: !Sub '${AWS::StackName}-MerlindomxS3EndpointBeanstalk'
+  MerlindomxS3EndpointCodedeploy:
+    Description: Merlindomx S3 Endpoint for Codedeploy
+    Value: !GetAtt
+      - MerlindomxS3BucketCodedeploy
+      - DomainName
+    Export:
+      Name: !Sub '${AWS::StackName}-MerlindomxS3EndpointCodedeploy'
+  MerlindomxDevSG:
+    Description: Merlindomx DEV security group ID
+    Value: !GetAtt
+      - MerlindomxDevSG
+      - GroupId
+    Export:
+      Name: !Sub '${AWS::StackName}-MerlindomxDevSG'
+  MountTarget:
+    Description: Mount target ID for Development EFS
+    Value: !Ref MountTarget

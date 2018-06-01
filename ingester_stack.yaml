@@ -1,0 +1,418 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Merlindomx Ingester Layer Stack v1.2.0
+Parameters:
+  VpcStackName:
+    Description: VPC Stack Name.
+    Type: String
+    Default: MerlindomxTestVPC
+  DBStackName:
+    Description: DB Stack Name.
+    Type: String
+    Default: MerlindomxDB
+  IAMStackName:
+    Description: IAM Stack Name.
+    Type: String
+    Default: MerlindomxIAM
+  DevelopmentStackName:
+    Description: Development Stack Name.
+    Type: String
+    Default: MerlindomxDevelopment
+  Environment:
+    Description: VPC Environment
+    Type: String
+    MinLength: '1'
+    MaxLength: '4'
+    Default: test
+    AllowedValues:
+      - prod
+      - dev
+      - test
+    ConstraintDescription: 'Can contain only contain ''prod'', ''dev'' or ''test''.'
+  Identifier:
+    Type: String
+    Default: blue
+    Description: Launch deployment stack (blue/green)
+  ImageId:
+    Type: String
+    Default: ami-eb1ecd96
+    Description: Autoscaling EC2 instances AMI
+  MinInstances:
+    Type: Number
+    Default: '1'
+    Description: AutoScaling Min Capacity
+  MaxInstances:
+    Type: Number
+    Default: '2'
+    Description: AutoScaling Max Capacity
+  DesiredCapacity:
+    Type: Number
+    Default: '1'
+    Description: AutoScaling Desired Capacity
+  InstanceType:
+    Description: AutoScaling Instance Type
+    Type: String
+    Default: t2.medium
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to instances
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair
+  CodeDeployS3Bucket:
+    Description: Codedeploy Bucket Name
+    Type: String
+    Default: Merlindomx-stratalux-codedeploy
+  CodeDeployS3Key:
+    Type: String
+    Description: Code Deploy Object Key
+    Default: Merlindomxjobs.zip
+  ChefS3Bucket:
+    Type: String
+    Description: Chef S3 source bucket
+    Default: Merlindomx-stratalux-chef
+  ChefS3Prefix:
+    Type: String
+    Description: Chef S3 bucket prefix
+    Default: test
+  ChefEnvironment:
+    Type: String
+    Description: Chef environment
+    Default: MerlindomxStrataluxTest
+  ChefOrganization:
+    Type: String
+    Description: Chef organization
+    Default: strataluxtest
+  ChefRunlist:
+    Type: String
+    Description: Chef runlist
+    Default: '"recipe[env_stratalux_Merlindomx_test]","recipe[role_Merlindomx_windows_base]"'
+  StlxProjectTag:
+    Type: String
+    Description: Stratalux Project Tag used for billing
+    Default: MerlindomxIngester
+Mappings:
+  Region2Index:
+    us-east-1:
+      REGION: '0'
+    us-west-1:
+      REGION: '1'
+    us-west-2:
+      REGION: '2'
+  Env2Names:
+    prod:
+      Suffix: prod
+    test:
+      Suffix: test
+    dev:
+      Suffix: dev
+  Env2Endpoint:
+    prod:
+      hostname: Merlindomx-ing
+    dev:
+      hostname: Merlindomx-ing-dev
+    test:
+      hostname: Merlindomx-ing-test
+  ChefEnvironment:
+    prod:
+      ChefEnv: MerlindomxStrataluxProd
+    test:
+      ChefEnv: MerlindomxStrataluxTest
+    dev:
+      ChefEnv: MerlindomxStrataluxDevelopment
+  ChefEnvCookbook:
+    prod:
+      ChefEnv: env_stratalux_Merlindomx_prod
+    test:
+      ChefEnv: env_stratalux_Merlindomx_test
+    dev:
+      ChefEnv: env_stratalux_Merlindomx_development
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: General Stack Settings
+        Parameters:
+          - VpcStackName
+          - DBStackName
+          - IAMStackName
+          - DevelopmentStackName
+          - Environment
+          - identifier
+          - StlxProjectTag
+      - Label:
+          default: Beanstalk Configuration
+        Parameters:
+          - ImageId
+          - MinInstances
+          - MaxInstances
+          - DesiredCapacity
+          - InstanceType
+          - KeyName
+          - CodeDeployS3Bucket
+          - CodeDeployS3Key
+    ParameterLabels:
+      VPCID:
+        default: Inputs for Ingester layer creation
+Conditions: {}
+Resources:
+  AutoScalingGroup:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    Properties:
+      VPCZoneIdentifier:
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-PrivateSubnet1A'
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-PrivateSubnet1B'
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-PrivateSubnet1C'
+      LaunchConfigurationName: !Ref AsgLaunchConfig
+      MinSize: !Ref MinInstances
+      MaxSize: !Ref MaxInstances
+      DesiredCapacity: !Ref DesiredCapacity
+      HealthCheckGracePeriod: '900'
+      MetricsCollection:
+        - Granularity: 1Minute
+      Tags:
+        - PropagateAtLaunch: 'True'
+          Key: Name
+          Value: !Join
+            - .
+            - - !Join
+                - ''
+                - - !Ref Environment
+                  - '-Merlindomx-'
+                  - !Ref Identifier
+              - !ImportValue
+                'Fn::Sub': '${VpcStackName}-DNSDomain'
+        - PropagateAtLaunch: 'True'
+          Key: Identifier
+          Value: !Ref Identifier
+        - PropagateAtLaunch: 'True'
+          Key: Environment
+          Value: !Ref Environment
+        - PropagateAtLaunch: 'True'
+          Key: CodeDeployGroup
+          Value: !Join
+            - '-'
+            - - !Ref Environment
+              - Merlindomx
+              - !Ref Identifier
+        - Key: 'stlx:project'
+          PropagateAtLaunch: 'True'
+          Value: !Ref StlxProjectTag
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: !Ref MinInstances
+        MaxBatchSize: '2'
+        WaitOnResourceSignals: 'false'
+  AsgLaunchConfig:
+    Type: 'AWS::AutoScaling::LaunchConfiguration'
+    Properties:
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !ImportValue
+        'Fn::Sub': '${IAMStackName}-MerlindomxInstanceProfile'
+      KeyName: !Ref KeyName
+      AssociatePublicIpAddress: 'False'
+      ImageId: !Ref ImageId
+      SecurityGroups:
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-common'
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-env'
+        - !ImportValue
+          'Fn::Sub': '${DevelopmentStackName}-MerlindomxDevSG'
+      UserData: !Base64
+        'Fn::Join':
+          - ''
+          - - |
+              <script>
+            - powershell.exe Read-S3Object -BucketName aws-codedeploy-
+            - !Ref 'AWS::Region'
+            - >
+              /latest -Key codedeploy-agent.msi -File
+              c:\tools\codedeploy-agent.msi
+            - 'powershell.exe Read-S3Object -BucketName '
+            - !Ref ChefS3Bucket
+            - |2
+               -Key AWSCLI64.msi -File c:\tools\AWSCLI64.msi
+            - >
+              c:\tools\codedeploy-agent.msi /quiet /l
+              c:\tools\codedeploy-agent-install-log.txt
+            - |
+              c:\tools\AWSCLI64.msi /quiet /l c:\tools\awscli-install-log.txt
+            - 'cfn-init.exe -v -s '
+            - !Ref 'AWS::StackId'
+            - ' -r AsgLaunchConfig'
+            - ' --region '
+            - !Ref 'AWS::Region'
+            - |+
+
+            - 'cfn-signal.exe -e %ERRORLEVEL% '
+            - !Base64
+              Ref: ChefWaitHandle
+            - |+
+
+            - </script>
+    Metadata:
+      'AWS::CloudFormation::Init':
+        config:
+          files:
+            'C:\cfn\cfn-hup.conf':
+              content: !Join
+                - ''
+                - - |
+                    [main]
+                  - stack=
+                  - !Ref 'AWS::StackId'
+                  - |+
+
+                  - region=
+                  - !Ref 'AWS::Region'
+                  - |+
+
+            'C:\cfn\hooks.d\cfn-auto-reloader.conf':
+              content: !Join
+                - ''
+                - - |
+                    [cfn-auto-reloader-hook]
+                  - |
+                    triggers=post.update
+                  - >
+                    path=Resources.AsgLaunchConfig.Metadata.AWS::CloudFormation::Init
+                  - 'action=cfn-init.exe -v -s '
+                  - !Ref 'AWS::StackId'
+                  - ' -r AsgLaunchConfig'
+                  - ' --region '
+                  - !Ref 'AWS::Region'
+                  - |+
+
+            'C:\WINDOWS\system32\GroupPolicy\Machine\Scripts\scripts.ini':
+              content: !Join
+                - ''
+                - - |
+                    [Shutdown]
+                  - |
+                    0CmdLine=C:\chef\remove_chef.cmd
+                  - 0Parameters=
+          commands:
+            1-download_ps_script:
+              command: !Join
+                - ''
+                - - 'C:\"Program Files\Amazon\AWSCLI\aws.exe" s3 cp s3://'
+                  - !Ref ChefS3Bucket
+                  - '/chef_client.ps1 c:\tools'
+              waitAfterCompletion: 0
+            2-run_chef_prep_ps_script:
+              command: !Join
+                - ''
+                - - 'powershell.exe -Command "c:\tools\chef_client.ps1 '
+                  - !Ref ChefS3Bucket
+                  - ' '
+                  - !Ref ChefS3Prefix
+                  - ' '
+                  - !Ref ChefEnvironment
+                  - ' '
+                  - !Ref ChefRunlist
+                  - ' '
+                  - !Ref ChefOrganization
+                  - '"'
+              waitAfterCompletion: 0
+            3-run_chef_converge:
+              command: !Join
+                - ''
+                - - 'C:\opscode\chef\bin\chef-client.bat -r '
+                  - !Ref ChefRunlist
+                  - ' -E '
+                  - !Ref ChefEnvironment
+              waitAfterCompletion: 0
+            4-set_shutdown_script:
+              command: 'C:\windows\regedit.exe /S c:\chef\shutdown_script.reg'
+              waitAfterCompletion: 0
+            5-run_gpupdate:
+              command: 'C:\windows\system32\gpupdate.exe /force'
+              waitAfterCompletion: 0
+          services:
+            windows:
+              cfn-hup:
+                enabled: 'true'
+                ensureRunning: 'true'
+                files:
+                  - 'c:\cfn\cfn-hup.conf'
+                  - 'c:\cfn\hooks.d\cfn-auto-reloader.conf'
+  ChefWaitHandle:
+    Type: 'AWS::CloudFormation::WaitConditionHandle'
+    Properties: {}
+  ChefClientWaitCondition:
+    Type: 'AWS::CloudFormation::WaitCondition'
+    DependsOn: AutoScalingGroup
+    Properties:
+      Count: '1'
+      Handle: !Ref ChefWaitHandle
+      Timeout: '1800'
+  CPUAlarmHigh:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmDescription: Scale-up if CPU > 99% for 50 minutes
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: '1500'
+      EvaluationPeriods: '1'
+      Threshold: '99'
+      AlarmActions:
+        - !Ref ServerScaleUpPolicy
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref AutoScalingGroup
+      ComparisonOperator: GreaterThanThreshold
+  CPUAlarmLow:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmDescription: Scale-down if CPU <10% for 50 min
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: '1500'
+      EvaluationPeriods: '4'
+      Threshold: '10'
+      AlarmActions:
+        - !Ref ServerScaleDownPolicy
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref AutoScalingGroup
+      ComparisonOperator: LessThanThreshold
+  ServerScaleUpPolicy:
+    Type: 'AWS::AutoScaling::ScalingPolicy'
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      Cooldown: '600'
+      ScalingAdjustment: '1'
+  ServerScaleDownPolicy:
+    Type: 'AWS::AutoScaling::ScalingPolicy'
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      Cooldown: '600'
+      ScalingAdjustment: '-1'
+  MerlindomxIngesterApp:
+    Type: 'AWS::CodeDeploy::Application'
+    DependsOn: AutoScalingGroup
+  MerlindomxIngesterDeploymentGroup:
+    Type: 'AWS::CodeDeploy::DeploymentGroup'
+    DependsOn:
+      - MerlindomxIngesterApp
+    Properties:
+      AutoScalingGroups:
+        - !Ref AutoScalingGroup
+      ApplicationName: !Ref MerlindomxIngesterApp
+      Deployment:
+        Description: Initial deployment
+        IgnoreApplicationStopFailures: 'true'
+        Revision:
+          RevisionType: S3
+          S3Location:
+            Bucket: !Ref CodeDeployS3Bucket
+            BundleType: Zip
+            Key: !Ref CodeDeployS3Key
+      ServiceRoleArn: !ImportValue
+        'Fn::Sub': '${IAMStackName}-MerlindomxInstanceRoleArn'
+Outputs: {}

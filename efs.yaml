@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Merlindomx EFS Stack v1.2.0
+Parameters:
+  VpcStackName:
+    Description: VPC Stack Name.
+    Type: String
+    Default: MerlindomxTestVPC
+  DevelompentStackName:
+    Description: Develompent Stack Name.
+    Type: String
+    Default: MerlindomxDevelopment
+  Environment:
+    Description: VPC Environment
+    Type: String
+    MinLength: '1'
+    MaxLength: '4'
+    Default: test
+    AllowedValues:
+      - prod
+      - dev
+      - test
+    ConstraintDescription: 'Can contain only contain prod, dev or test.'
+  EFSPerformanceMode:
+    Description: EFS Performance mode
+    Type: String
+    Default: generalPurpose
+Mappings:
+  Region2Index:
+    eu-west-1:
+      REGION: '0'
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: General Stack Settings
+        Parameters:
+          - VpcStackName
+          - DevelompentStackName
+          - Environment
+          - EFSPerformanceMode
+    ParameterLabels:
+      VPCID:
+        default: Inputs for Development layer stack creation
+Conditions: {}
+Resources:
+  IngesterFileSystem:
+    Type: 'AWS::EFS::FileSystem'
+    Properties:
+      PerformanceMode: !Ref EFSPerformanceMode
+      FileSystemTags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - Merlindomxingester
+              - !Ref Environment
+              - fs
+  MountTargetA:
+    Type: 'AWS::EFS::MountTarget'
+    Properties:
+      FileSystemId: !Ref IngesterFileSystem
+      SubnetId: !ImportValue
+        'Fn::Sub': '${VpcStackName}-PrivateSubnet1A'
+      SecurityGroups:
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-common'
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-env'
+        - !ImportValue
+          'Fn::Sub': '${DevelompentStackName}-MerlindomxDevSG'
+  MountTargetB:
+    Type: 'AWS::EFS::MountTarget'
+    Properties:
+      FileSystemId: !Ref IngesterFileSystem
+      SubnetId: !ImportValue
+        'Fn::Sub': '${VpcStackName}-PrivateSubnet1B'
+      SecurityGroups:
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-common'
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-env'
+        - !ImportValue
+          'Fn::Sub': '${DevelompentStackName}-MerlindomxDevSG'
+  MountTargetC:
+    Type: 'AWS::EFS::MountTarget'
+    Properties:
+      FileSystemId: !Ref IngesterFileSystem
+      SubnetId: !ImportValue
+        'Fn::Sub': '${VpcStackName}-PrivateSubnet1C'
+      SecurityGroups:
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-common'
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-env'
+        - !ImportValue
+          'Fn::Sub': '${DevelompentStackName}-MerlindomxDevSG'
+Outputs:
+  MountTargetA:
+    Description: Mount target A ID
+    Value: !Ref MountTargetA
+  MountTargetB:
+    Description: Mount target B ID
+    Value: !Ref MountTargetB
+  MountTargetC:
+    Description: Mount target C ID
+    Value: !Ref MountTargetC

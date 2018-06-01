@@ -1,0 +1,13 @@
+Parameters:
+  VpcStackName: MerlindomxTestVPC
+  DBStackName: MerlindomxDB
+  IAMStackName: MerlindomxIAM
+  DevelopmentStackName: MerlindomxDevelopment
+  Identifier: identif
+Tags:
+  PipelineTag: MerlindomxIngesterCD
+StackPolicy:
+  Statement:
+    - Effect: Allow
+      Principal: '*'
+      Resource: '*'

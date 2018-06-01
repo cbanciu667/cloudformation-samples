@@ -1,0 +1,29 @@
+Parameters:
+  VpcStackName: MerlindomxTestVPC
+  DBStackName: MerlindomxDB
+  IAMStackName: MerlindomxIAM
+  DevelopmentStackName: MerlindomxDevelopment
+  Environment: test
+  Identifier: identif
+  ImageId: ami-eb1ecd96
+  MinInstances: '1'
+  MaxInstances: '2'
+  DesiredCapacity: '1'
+  InstanceType: t2.medium
+  KeyName: id_rsa_cos
+  CodeDeployS3Bucket: Merlindomx-stratalux-codedeploy
+  CodeDeployS3Key: Merlindomxjobs.zip
+  ChefS3Bucket: Merlindomx-stratalux-chef
+  ChefS3Prefix: test
+  ChefEnvironment: MerlindomxStrataluxTest
+  ChefOrganization: strataluxtest
+  ChefRunlist: >-
+    "recipe[env_stratalux_Merlindomx_test]","recipe[role_Merlindomx_windows_base]"
+  StlxProjectTag: MerlindomxIngester
+Tags:
+  PipelineTag: MerlindomxIngesterCI
+StackPolicy:
+  Statement:
+    - Effect: Allow
+      Principal: '*'
+      Resource: '*'

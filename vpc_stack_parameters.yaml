@@ -1,0 +1,19 @@
+Parameters:
+  Customer: MerlindomxMerlindomxTest
+  ProjectTag: MerlindomxMerlindomxTest
+  Environment: test
+  DevelopmentStackName: MerlindomxDevelopment
+  KeyName: test
+  VPNInstanceType: t2.small
+  VPNIamInstanceProfile: MerlindomxEssentials-Iam-1UT8X61CB625A-MerlindomxMonitoringIamInstanceProfile-1NEE0VKHMIZGZ
+  DNSDomain: Merlindomxtest.Merlindomx.net
+  VPCSubnets: '10.227.0.0/21, 10.228.0.0/21, 10.229.0.0/21'
+  SslCertificateId: >-
+    arn:aws:acm:....
+Tags:
+  PipelineTag: MerlindomxWebCI
+StackPolicy:
+  Statement:
+    - Effect: Allow
+      Principal: '*'
+      Resource: '*'

@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Merlindomx Ingester CD Pipeline Stack v1.2.0 '
+Parameters:
+  VpcStackName:
+    Description: VPC Stack Name.
+    Type: String
+    Default: MerlindomxTestVPC
+  IAMStackName:
+    Description: IAM Stack Name.
+    Type: String
+    Default: MerlindomxIAM
+  DevelopmentStackName:
+    Description: Development Stack Name.
+    Type: String
+    Default: MerlindomxDevelopment
+  DBStackName:
+    Description: DB Stack Name.
+    Type: String
+    Default: MerlindomxDB
+  Identifier:
+    Description: Merlindomx Ingester Stack Identifier
+    Type: String
+    Default: identif
+Mappings: {}
+Metadata: {}
+Conditions: {}
+Resources:
+  MerlindomxWebCD:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      RoleArn: !ImportValue
+        'Fn::Sub': '${IAMStackName}-MerlindomxCodePipelineRoleArn'
+      Name: MerlindomxIngesterCD
+      Stages:
+        - Name: Source
+          Actions:
+            - InputArtifacts: []
+              Name: IngesterSourceS3
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: '1'
+                Provider: S3
+              OutputArtifacts:
+                - Name: prod_app
+              Configuration:
+                S3Bucket: Merlindomx-stratalux-codedeploy
+                PollForSourceChanges: 'true'
+                S3ObjectKey: ready_to_deploy/Merlindomxjobs.zip
+              RunOrder: 1
+            - InputArtifacts: []
+              Name: ProdCF
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: '1'
+                Provider: S3
+              OutputArtifacts:
+                - Name: Merlindomx_prod_stack
+              Configuration:
+                S3Bucket: Merlindomx-stratalux-codedeploy
+                PollForSourceChanges: 'true'
+                S3ObjectKey: cloudformation/Merlindomxingestercf.zip
+              RunOrder: 1
+        - Name: ApproveDeployment
+          Actions:
+            - InputArtifacts: []
+              Name: ApproveDeploymentToProd
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Version: '1'
+                Provider: Manual
+              OutputArtifacts: []
+              Configuration: {}
+              RunOrder: 1
+        - Name: MerlindomxIngesterProd
+          Actions:
+            - InputArtifacts:
+                - Name: Merlindomx_prod_stack
+              Name: MerlindomxProductionDeploy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CloudFormation
+              OutputArtifacts: []
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                RoleArn: !ImportValue
+                  'Fn::Sub': '${IAMStackName}-MerlindomxCodePipelineCFRoleArn'
+                Capabilities: CAPABILITY_IAM
+                StackName: !Ref Identifier
+                TemplateConfiguration: 'Merlindomx_prod_stack::Merlindomx_ingester_conf.json'
+                TemplatePath: 'Merlindomx_prod_stack::Merlindomx_ingester_test.json'
+              RunOrder: 1
+      ArtifactStore:
+        Type: S3
+        Location: codepipeline-us-east-1-783772503621
+    Metadata:
+      PipelineArn: 'arn:aws:codepipeline:us-east-1:209007363681:MerlindomxIngesterCD'

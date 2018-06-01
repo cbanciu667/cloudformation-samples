@@ -1,0 +1,20 @@
+Parameters:
+  VpcStackName: MerlindomxTestVPC
+  DBStackName: MerlindomxDB
+  IAMStackName: MerlindomxIAM
+  DevelopmentStackName: MerlindomxDevelopment
+  Environment: test
+  Weight: '100'
+  MinInstances: '1'
+  MaxInstances: '2'
+  SslCertificateId: >-
+    arn:aws:acm:....
+  AutoScalingInstanceType: t2.medium
+  KeyName: id_rsa_cos
+Tags:
+  PipelineTag: MerlindomxWebCI
+StackPolicy:
+  Statement:
+    - Effect: Allow
+      Principal: '*'
+      Resource: '*'

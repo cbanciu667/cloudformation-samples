@@ -1,0 +1,148 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Merlindomx DB Stack v1.2.0
+Parameters:
+  VpcStackName:
+    Description: VPC Stack Name.
+    Type: String
+    Default: MerlindomxTestVPC
+  DevelompentStackName:
+    Description: Develompent Stack Name.
+    Type: String
+    Default: MerlindomxDevelopment
+  Environment:
+    Description: VPC Environment
+    Type: String
+    MinLength: '1'
+    MaxLength: '4'
+    Default: test
+    AllowedValues:
+      - prod
+      - dev
+      - test
+    ConstraintDescription: 'Can contain only contain prod, dev or test.'
+  DBSourceSnapshot:
+    Type: String
+    Description: DB source snapshot for the RDS instance.
+  DBUsername:
+    Type: String
+    Description: >-
+      DB Username and password will be restored with the snapshot in case DB
+      snapshot exists.
+    Default: DBUser
+    MinLength: '1'
+    MaxLength: '15'
+    AllowedPattern: '^[a-zA-Z0-9]*$'
+  DBPassword:
+    Type: String
+    Description: >-
+      DB Username and password will be restored with the snapshot in case DB
+      snapshot exists.
+    NoEcho: 'true'
+    MinLength: '1'
+    MaxLength: '41'
+  RDSInstanceType:
+    Description: Development EC2 instance type
+    Type: String
+    AllowedValues:
+      - db.m1.small
+      - db.m4.large
+      - db.m4.xlarge
+      - db.m4.2xlarge
+      - db.t2.medium
+      - db.t2.large
+    ConstraintDescription: must be a valid EC2 instance type.
+    Default: db.m1.small
+Mappings:
+  Region2Index:
+    eu-west-1:
+      REGION: '0'
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: General Stack Settings
+        Parameters:
+          - VpcStackName
+          - DevelompentStackName
+          - Environment
+      - Label:
+          default: DB and Dev intance configuration
+        Parameters:
+          - DBSourceSnapshot
+          - DBUsername
+          - DBPassword
+          - RDSInstanceType
+    ParameterLabels:
+      VPCID:
+        default: Inputs for DB layer stack creation
+Conditions: {}
+Resources:
+  MerlindomxDBSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Merlindomx DB SG
+      VpcId: !ImportValue
+        'Fn::Sub': '${VpcStackName}-VPC'
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref VpcStackName
+              - MerlindomxDevInstance
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '0'
+          ToPort: '65535'
+          SourceSecurityGroupId: !ImportValue
+            'Fn::Sub': '${DevelompentStackName}-MerlindomxDevSG'
+  MerlindomxDBSubnetGroup:
+    Type: 'AWS::RDS::DBSubnetGroup'
+    Properties:
+      DBSubnetGroupDescription: RDS SG for inbound subnets
+      SubnetIds:
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-PrivateSubnet1A'
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-PrivateSubnet1B'
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-PrivateSubnet1C'
+      Tags:
+        - Key: Name
+          Value: MerlindomxDBSubnetGroup
+  DBSecurityGroup:
+    Type: 'AWS::RDS::DBSecurityGroup'
+    Properties:
+      EC2VpcId: !ImportValue
+        'Fn::Sub': '${VpcStackName}-VPC'
+      DBSecurityGroupIngress:
+        - EC2SecurityGroupId: !GetAtt
+            - MerlindomxDBSG
+            - GroupId
+      GroupDescription: Merlindomx DB access
+  MerlindomxDB:
+    Type: 'AWS::RDS::DBInstance'
+    DeletionPolicy: Retain
+    Properties:
+      AllocatedStorage: '300'
+      DBInstanceClass: !Ref RDSInstanceType
+      Engine: sqlserver-se
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      CopyTagsToSnapshot: 'true'
+      AutoMinorVersionUpgrade: 'true'
+      DBSnapshotIdentifier: !Ref DBSourceSnapshot
+      DBSubnetGroupName: !Ref MerlindomxDBSubnetGroup
+      DBSecurityGroups:
+        - !Ref DBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !ImportValue
+            'Fn::Sub': '${VpcStackName}-ProjectTag'
+Outputs:
+  MerlindomxDBEndpoint:
+    Description: Merlindomx RDS DB Endpoint
+    Value: !GetAtt
+      - MerlindomxDB
+      - Endpoint.Address
+    Export:
+      Name: !Sub '${AWS::StackName}-MerlindomxDbEndpoint'

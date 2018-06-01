@@ -1,0 +1,929 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Merlindomx Base VPC v1.2.0
+Parameters:
+  Customer:
+    Description: Customer Name
+    Type: String
+    MinLength: '1'
+    MaxLength: '30'
+    Default: MerlindomxMerlindomxTest
+  ProjectTag:
+    Type: String
+    Description: Merlindomx Project Tag used for billing
+    Default: MerlindomxMerlindomxTest
+  Environment:
+    Description: VPC environment
+    Type: String
+    MinLength: '1'
+    MaxLength: '4'
+    Default: test
+    AllowedValues:
+      - prod
+      - dev
+      - test
+    ConstraintDescription: 'Can contain only contain prod, dev or test.'
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to instances
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair
+  VPNInstanceType:
+    Description: VPN EC2 instance type
+    Type: String
+    AllowedValues:
+      - t2.small
+      - t2.medium
+      - t2.large
+    ConstraintDescription: must be a valid EC2 instance type.
+    Default: t2.small
+  VPNIamInstanceProfile:
+    Description: Existing VPN IAM Instance Profile
+    Type: String
+    ConstraintDescription: Must be the name of an existing IAM InstanceProfile
+    Default: >-
+      MerlindomxEssentials-Iam-1UT8X61CB625A-MerlindomxMonitoringIamInstanceProfile-1NEE0VKHMIZGZ
+  DNSDomain:
+    Description: DNS Domain for current environment
+    Type: String
+    Default: Merlindomxtest.Merlindomx.net
+  ATTENTION:
+    Description: >-
+      !!! Make sure CIDR blocks do not exist in another Merlindomx account or region
+      !!!
+    Type: String
+    Default: >-
+      Check URL:
+      https://URL/VPCs+IP+allocation+table
+  VPCSubnets:
+    Description: >-
+      Comma-delimited list of three UNIQUE CIDR blocks for prod, dev and test.
+      Respect order.
+    Type: CommaDelimitedList
+    Default: '10.227.0.0/21, 10.228.0.0/21, 10.229.0.0/21'
+  Public1ASubnets:
+    Description: >-
+      Comma-delimited list of three UNIQUE CIDR blocks for prod, dev and test
+      Respect order.
+    Type: CommaDelimitedList
+    Default: '10.227.0.0/26, 10.228.0.64/26, 10.229.0.128/26'
+  Public1BSubnets:
+    Description: >-
+      Comma-delimited list of three UNIQUE CIDR blocks for prod, dev and test
+      Respect order.
+    Type: CommaDelimitedList
+    Default: '10.227.1.0/26, 10.228.1.64/26, 10.229.1.128/26'
+  Public1CSubnets:
+    Description: >-
+      Comma-delimited list of three UNIQUE CIDR blocks for prod, dev and test
+      Respect order.
+    Type: CommaDelimitedList
+    Default: '10.227.2.0/26, 10.228.2.64/26, 10.229.2.128/26'
+  Private1ASubnets:
+    Description: >-
+      Comma-delimited list of three UNIQUE CIDR blocks for prod, dev and test
+      Respect order.
+    Type: CommaDelimitedList
+    Default: '10.227.3.0/26, 10.228.3.64/26, 10.229.3.128/26'
+  Private1BSubnets:
+    Description: >-
+      Comma-delimited list of three UNIQUE CIDR blocks for prod, dev and test
+      Respect order.
+    Type: CommaDelimitedList
+    Default: '10.227.4.0/26, 10.228.4.64/26, 10.229.4.128/26'
+  Private1CSubnets:
+    Description: >-
+      Comma-delimited list of three CIDR blocks for prod, dev and test Respect
+      order.
+    Type: CommaDelimitedList
+    Default: '10.227.5.0/26, 10.228.5.64/26, 10.229.5.128/26'
+  PeeringId1:
+    Description: VPC ID for VPC Peer 1 (Optional)
+    Type: String
+    Default: ''
+  PeerVpcCidr1:
+    Description: VPC CIDR address for VPC Peer 1 (Optional)
+    Type: String
+    Default: ''
+Conditions:
+  isProd: !Equals
+    - !Ref Environment
+    - prod
+  isDev: !Equals
+    - !Ref Environment
+    - dev
+  isTest: !Equals
+    - !Ref Environment
+    - test
+  hasPeering1: !And
+    - !Not
+      - !Equals
+        - !Ref PeeringId1
+        - ''
+    - !Not
+      - !Equals
+        - !Ref PeerVpcCidr1
+        - ''
+Mappings:
+  Region2AWSNATAMI:
+    us-east-1:
+      NATAMI: ami-8d7655f7
+    us-east-2:
+      NATAMI: ami-fc3b1199
+    us-west-1:
+      NATAMI: ami-394e4c59
+    us-west-2:
+      NATAMI: ami-35d6664d
+    eu-west-1:
+      NATAMI: ami-a136a9d8
+    eu-west-2:
+      NATAMI: ami-87312ae3
+  Region2MerlindomxVPNAMI:
+    us-east-1:
+      VPNAMI: ami-0d406277
+    us-east-2:
+      VPNAMI: ami-d30a20b6
+    us-west-1:
+      VPNAMI: ami-4a4d4f2a
+    us-west-2:
+      VPNAMI: ami-ec77c194
+    eu-west-1:
+      VPNAMI: ami-844ed0fd
+    eu-west-2:
+      VPNAMI: ami-692c370d
+  Env2Index:
+    prod:
+      ENV: '0'
+    dev:
+      ENV: '1'
+    test:
+      ENV: '2'
+  Env2Names:
+    prod:
+      Suffix: ''
+    dev:
+      Suffix: ''
+    test:
+      Suffix: ''
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: General VPC Settings
+        Parameters:
+          - Customer
+          - ProjectTag
+          - Environment
+          - KeyName
+          - VPNInstanceType
+          - VPNIamInstanceProfile
+      - Label:
+          default: VPC Network Configuration
+        Parameters:
+          - DNSDomain
+          - ATTENTION
+          - VPCSubnets
+          - Public1ASubnets
+          - Public1BSubnets
+          - Public1CSubnets
+          - Private1ASubnets
+          - Private1BSubnets
+          - Private1CSubnets
+          - PeeringId1
+          - PeerVpcCidr1
+    ParameterLabels:
+      VPCID:
+        default: Inputs for VPC stack creation
+Resources:
+  DNSDomainZone:
+    Type: 'AWS::Route53::HostedZone'
+    Properties:
+      HostedZoneConfig:
+        Comment: Merlindomx Stack VPC - Route53 Hosted Zone
+      Name: !Ref DNSDomain
+  dhcpOptions:
+    Type: 'AWS::EC2::DHCPOptions'
+    Properties:
+      DomainName: !Ref DNSDomain
+      DomainNameServers:
+        - AmazonProvidedDNS
+  DhcpOptionsAssoc:
+    Type: 'AWS::EC2::VPCDHCPOptionsAssociation'
+    Properties:
+      DhcpOptionsId: !Ref dhcpOptions
+      VpcId: !Ref VPC
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !Select
+        - !FindInMap
+          - Env2Index
+          - !Ref Environment
+          - ENV
+        - !Ref VPCSubnets
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref 'AWS::Region'
+              - !Ref Environment
+        - Key: Application
+          Value: !Ref 'AWS::StackName'
+        - Key: Network
+          Value: Public
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  PublicSubnet1A:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select
+        - '0'
+        - !GetAZs ''
+      CidrBlock: !Select
+        - !FindInMap
+          - Env2Index
+          - !Ref Environment
+          - ENV
+        - !Ref Public1ASubnets
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - PublicSubnet1A
+        - Key: Application
+          Value: !Ref 'AWS::StackName'
+        - Key: Network
+          Value: Public
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  PublicSubnet1B:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select
+        - '1'
+        - !GetAZs ''
+      CidrBlock: !Select
+        - !FindInMap
+          - Env2Index
+          - !Ref Environment
+          - ENV
+        - !Ref Public1BSubnets
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - PublicSubnet1B
+        - Key: Application
+          Value: !Ref 'AWS::StackName'
+        - Key: Network
+          Value: Public
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  PublicSubnet1C:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select
+        - '2'
+        - !GetAZs ''
+      CidrBlock: !Select
+        - !FindInMap
+          - Env2Index
+          - !Ref Environment
+          - ENV
+        - !Ref Public1CSubnets
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - PublicSubnet1C
+        - Key: Application
+          Value: !Ref 'AWS::StackName'
+        - Key: Network
+          Value: Public
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackName'
+        - Key: Network
+          Value: Public
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  GatewayToInternet:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackName'
+        - Key: Network
+          Value: Public
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - PublicRouteTable
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicRoutePeer1:
+    Type: 'AWS::EC2::Route'
+    Condition: hasPeering1
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: !Ref PeerVpcCidr1
+      VpcPeeringConnectionId: !Ref PeeringId1
+  PublicSubnet1ARouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet1A
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnet1BRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet1B
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnet1CRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet1C
+      RouteTableId: !Ref PublicRouteTable
+  PublicNetworkAcl:
+    Type: 'AWS::EC2::NetworkAcl'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackName'
+        - Key: Network
+          Value: Public
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - PublicACL
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  InboundPublicNetworkAclDefault:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      RuleNumber: '1000'
+      Protocol: '-1'
+      RuleAction: allow
+      Egress: 'false'
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: '0'
+        To: '65535'
+  OutboundPublicNetworkAclDefault:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      RuleNumber: '1000'
+      Protocol: '-1'
+      RuleAction: allow
+      Egress: 'true'
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: '0'
+        To: '65535'
+  PublicSubnet1ANetworkAclAssociation:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet1A
+      NetworkAclId: !Ref PublicNetworkAcl
+  PublicSubnet1BNetworkAclAssociation:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet1B
+      NetworkAclId: !Ref PublicNetworkAcl
+  PublicSubnet1CNetworkAclAssociation:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet1C
+      NetworkAclId: !Ref PublicNetworkAcl
+  PrivateSubnet1A:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select
+        - '0'
+        - !GetAZs ''
+      CidrBlock: !Select
+        - !FindInMap
+          - Env2Index
+          - !Ref Environment
+          - ENV
+        - !Ref Private1ASubnets
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - PrivateSubnet1A
+        - Key: Application
+          Value: !Ref 'AWS::StackName'
+        - Key: Network
+          Value: Private
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  PrivateSubnet1B:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select
+        - '1'
+        - !GetAZs ''
+      CidrBlock: !Select
+        - !FindInMap
+          - Env2Index
+          - !Ref Environment
+          - ENV
+        - !Ref Private1BSubnets
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - PrivateSubnet1B
+        - Key: Application
+          Value: !Ref 'AWS::StackName'
+        - Key: Network
+          Value: Private
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  PrivateSubnet1C:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select
+        - '2'
+        - !GetAZs ''
+      CidrBlock: !Select
+        - !FindInMap
+          - Env2Index
+          - !Ref Environment
+          - ENV
+        - !Ref Private1CSubnets
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - PrivateSubnet1C
+        - Key: Application
+          Value: !Ref 'AWS::StackName'
+        - Key: Network
+          Value: Private
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  PrivateRouteTableA:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackName'
+        - Key: Network
+          Value: Private
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - PrivateRouteTableA
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  PrivateRouteTableB:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackName'
+        - Key: Network
+          Value: Private
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - PrivateRouteTableB
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  PrivateRouteTableC:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackName'
+        - Key: Network
+          Value: Private
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - PrivateRouteTableC
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  PrivateDefaultRouteA:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableA
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGatewayA
+  PrivateDefaultRouteB:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableB
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGatewayB
+  PrivateDefaultRouteC:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableC
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGatewayC
+  PrivatePeer1RouteA:
+    Type: 'AWS::EC2::Route'
+    Condition: hasPeering1
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableA
+      DestinationCidrBlock: !Ref PeerVpcCidr1
+      VpcPeeringConnectionId: !Ref PeeringId1
+  PrivatePeer1RouteB:
+    Type: 'AWS::EC2::Route'
+    Condition: hasPeering1
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableB
+      DestinationCidrBlock: !Ref PeerVpcCidr1
+      VpcPeeringConnectionId: !Ref PeeringId1
+  PrivatePeer1RouteC:
+    Type: 'AWS::EC2::Route'
+    Condition: hasPeering1
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableC
+      DestinationCidrBlock: !Ref PeerVpcCidr1
+      VpcPeeringConnectionId: !Ref PeeringId1
+  PrivateSubnet1ARouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivateSubnet1A
+      RouteTableId: !Ref PrivateRouteTableA
+  PrivateSubnet1BRouteTableAssociation1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivateSubnet1B
+      RouteTableId: !Ref PrivateRouteTableB
+  PrivateSubnet1CRouteTableAssociation1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivateSubnet1C
+      RouteTableId: !Ref PrivateRouteTableC
+  PrivateNetworkAcl:
+    Type: 'AWS::EC2::NetworkAcl'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackName'
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - PrivateACL
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  InboundPrivateNetworkAclDefault:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref PrivateNetworkAcl
+      RuleNumber: '1000'
+      Protocol: '-1'
+      RuleAction: allow
+      Egress: 'false'
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: '0'
+        To: '65535'
+  OutBoundPrivateNetworkAclDefault:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref PrivateNetworkAcl
+      RuleNumber: '1000'
+      Protocol: '-1'
+      RuleAction: allow
+      Egress: 'true'
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: '0'
+        To: '65535'
+  PrivateSubnet1ANetworkAclAssociation:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId: !Ref PrivateSubnet1A
+      NetworkAclId: !Ref PrivateNetworkAcl
+  PrivateSubnet1BNetworkAclAssociation1:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId: !Ref PrivateSubnet1B
+      NetworkAclId: !Ref PrivateNetworkAcl
+  PrivateSubnet1CNetworkAclAssociation1:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId: !Ref PrivateSubnet1C
+      NetworkAclId: !Ref PrivateNetworkAcl
+  S3Endpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: '*'
+            Effect: Allow
+            Resource: '*'
+            Principal: '*'
+      RouteTableIds:
+        - !Ref PrivateRouteTableA
+        - !Ref PrivateRouteTableB
+        - !Ref PrivateRouteTableC
+        - !Ref PublicRouteTable
+      ServiceName: !Join
+        - ''
+        - - com.amazonaws.
+          - !Ref 'AWS::Region'
+          - .s3
+      VpcId: !Ref VPC
+  NATIPAddressA:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+  NATGatewayA:
+    Type: 'AWS::EC2::NatGateway'
+    DependsOn: GatewayToInternet
+    Properties:
+      AllocationId: !GetAtt
+        - NATIPAddressA
+        - AllocationId
+      SubnetId: !Ref PublicSubnet1A
+  NATIPAddressB:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+  NATGatewayB:
+    Type: 'AWS::EC2::NatGateway'
+    DependsOn: GatewayToInternet
+    Properties:
+      AllocationId: !GetAtt
+        - NATIPAddressB
+        - AllocationId
+      SubnetId: !Ref PublicSubnet1B
+  NATIPAddressC:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+  NATGatewayC:
+    Type: 'AWS::EC2::NatGateway'
+    DependsOn: GatewayToInternet
+    Properties:
+      AllocationId: !GetAtt
+        - NATIPAddressC
+        - AllocationId
+      SubnetId: !Ref PublicSubnet1C
+  VPNIPAddressA:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref VPNHostA
+  VPNHostA:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: !Ref VPNInstanceType
+      IamInstanceProfile: !Ref VPNIamInstanceProfile
+      KeyName: !Ref KeyName
+      ImageId: !FindInMap
+        - Region2MerlindomxVPNAMI
+        - !Ref 'AWS::Region'
+        - VPNAMI
+      SubnetId: !Ref PublicSubnet1A
+      SecurityGroupIds:
+        - !Ref env
+        - !Ref common
+        - !Ref vpn
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - !Ref Environment
+              - '-vpn01'
+              - .
+              - !Ref DNSDomain
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+  nat:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enable internal access to the NAT device
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - nat
+        - Key: 'Merlindomx:project'
+          Value: !Ref ProjectTag
+      SecurityGroupIngress:
+        - IpProtocol: '-1'
+          FromPort: '0'
+          ToPort: '65535'
+          SourceSecurityGroupId: !Ref common
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: 0.0.0.0/0
+  env:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Central environment group used for overrides
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - env
+      SecurityGroupIngress: []
+  common:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Common environment settings
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - common
+      SecurityGroupIngress:
+        - IpProtocol: '-1'
+          FromPort: '0'
+          ToPort: '65535'
+          SourceSecurityGroupId: !Ref vpn
+  commonIngressFromZabbix:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !Ref common
+      IpProtocol: tcp
+      FromPort: '10050'
+      ToPort: '10051'
+      SourceSecurityGroupId: !Ref vpn
+  vpn:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: VPN servers
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Customer
+              - !Ref Environment
+              - vpn
+      SecurityGroupIngress:
+        - IpProtocol: udp
+          FromPort: '1194'
+          ToPort: '1194'
+          CidrIp: 0.0.0.0/0
+  vpnIngressZabbixFromCommon:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !Ref vpn
+      IpProtocol: tcp
+      FromPort: '10050'
+      ToPort: '10051'
+      SourceSecurityGroupId: !Ref common
+  vpnIngressOssecSrvFromCommon:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !Ref vpn
+      IpProtocol: udp
+      FromPort: '1514'
+      ToPort: '1514'
+      SourceSecurityGroupId: !Ref common
+  vpnIngressOssecAuthFromCommon:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !Ref vpn
+      IpProtocol: tcp
+      FromPort: '1515'
+      ToPort: '1515'
+      SourceSecurityGroupId: !Ref common
+Outputs:
+  VPCId:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: !Sub '${AWS::StackName}-VPC'
+  Route53ZoneId:
+    Description: Merlindomx Base VPC Route53 Zone ID
+    Value: !Ref DNSDomainZone
+    Export:
+      Name: !Sub '${AWS::StackName}-DNSDomainZone'
+  DNSDomain:
+    Description: Merlindomx Base VPC Route53 Domain
+    Value: !Ref DNSDomain
+    Export:
+      Name: !Sub '${AWS::StackName}-DNSDomain'
+  PrivateSubnet1A:
+    Description: PrivateSubnet1A
+    Value: !Ref PrivateSubnet1A
+    Export:
+      Name: !Sub '${AWS::StackName}-PrivateSubnet1A'
+  PrivateSubnet1B:
+    Description: PrivateSubnet1B
+    Value: !Ref PrivateSubnet1B
+    Export:
+      Name: !Sub '${AWS::StackName}-PrivateSubnet1B'
+  PrivateSubnet1C:
+    Description: PrivateSubnet1C
+    Value: !Ref PrivateSubnet1C
+    Export:
+      Name: !Sub '${AWS::StackName}-PrivateSubnet1C'
+  PublicSubnet1A:
+    Description: PublicSubnet1A
+    Value: !Ref PublicSubnet1A
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicSubnet1A'
+  PublicSubnet1B:
+    Description: PublicSubnet1B
+    Value: !Ref PublicSubnet1B
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicSubnet1B'
+  PublicSubnet1C:
+    Description: PublicSubnet1C
+    Value: !Ref PublicSubnet1C
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicSubnet1C'
+  common:
+    Description: common security group ID
+    Value: !GetAtt
+      - common
+      - GroupId
+    Export:
+      Name: !Sub '${AWS::StackName}-common'
+  env:
+    Description: env security env ID
+    Value: !GetAtt
+      - env
+      - GroupId
+    Export:
+      Name: !Sub '${AWS::StackName}-env'
+  vpn:
+    Description: vpn security group ID
+    Value: !GetAtt
+      - vpn
+      - GroupId
+    Export:
+      Name: !Sub '${AWS::StackName}-vpn'
+  ProjectTag:
+    Description: Project Tagging for billing purposes
+    Value: !Ref ProjectTag
+    Export:
+      Name: !Sub '${AWS::StackName}-ProjectTag'
