@@ -148,7 +148,7 @@ Resources:
               - .
               - !ImportValue
                 'Fn::Sub': '${VpcStackName}-DNSDomain'
-        - Key: 'stlx:project'
+        - Key: ':project'
           Value: !ImportValue
             'Fn::Sub': '${VpcStackName}-ProjectTag'
 Outputs:

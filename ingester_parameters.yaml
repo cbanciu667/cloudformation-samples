@@ -19,7 +19,7 @@ Parameters:
   ChefOrganization: merlindomxtest
   ChefRunlist: >-
     "recipe[env_merlindomx_Merlindomx_test]","recipe[role_Merlindomx_windows_base]"
-  StlxProjectTag: MerlindomxIngester
+  ProjectTag: MerlindomxIngester
 Tags:
   PipelineTag: MerlindomxIngesterCI
 StackPolicy:

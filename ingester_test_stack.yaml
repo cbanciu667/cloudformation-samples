@@ -85,7 +85,7 @@ Parameters:
     Description: Chef runlist
     Default: >-
       "recipe[env_merlindomx_Merlindomx_test]","recipe[role_Merlindomx_windows_base]"
-  StlxProjectTag:
+  ProjectTag:
     Type: String
     Description: merlindomx Project Tag used for billing
     Default: MerlindomxIngester
@@ -137,7 +137,7 @@ Metadata:
           - DevelopmentStackName
           - Environment
           - identifier
-          - StlxProjectTag
+          - ProjectTag
       - Label:
           default: Beanstalk Configuration
         Parameters:
@@ -196,9 +196,9 @@ Resources:
             - - !Ref Environment
               - Merlindomx
               - !Ref Identifier
-        - Key: 'stlx:project'
+        - Key: ':project'
           PropagateAtLaunch: 'True'
-          Value: !Ref StlxProjectTag
+          Value: !Ref ProjectTag
     UpdatePolicy:
       AutoScalingRollingUpdate:
         MinInstancesInService: !Ref MinInstances
