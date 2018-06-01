@@ -11,14 +11,14 @@ Parameters:
   DesiredCapacity: '1'
   InstanceType: t2.medium
   KeyName: id_rsa_cos
-  CodeDeployS3Bucket: Merlindomx-stratalux-codedeploy
+  CodeDeployS3Bucket: Merlindomx-merlindomx-codedeploy
   CodeDeployS3Key: Merlindomxjobs.zip
-  ChefS3Bucket: Merlindomx-stratalux-chef
+  ChefS3Bucket: Merlindomx-merlindomx-chef
   ChefS3Prefix: test
-  ChefEnvironment: MerlindomxStrataluxTest
-  ChefOrganization: strataluxtest
+  ChefEnvironment: MerlindomxmerlindomxTest
+  ChefOrganization: merlindomxtest
   ChefRunlist: >-
-    "recipe[env_stratalux_Merlindomx_test]","recipe[role_Merlindomx_windows_base]"
+    "recipe[env_merlindomx_Merlindomx_test]","recipe[role_Merlindomx_windows_base]"
   StlxProjectTag: MerlindomxIngester
 Tags:
   PipelineTag: MerlindomxIngesterCI

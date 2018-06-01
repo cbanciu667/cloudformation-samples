@@ -40,7 +40,7 @@ Resources:
               OutputArtifacts:
                 - Name: Merlindomxweb_artefact
               Configuration:
-                S3Bucket: Merlindomx-stratalux-beanstalk
+                S3Bucket: Merlindomx-merlindomx-beanstalk
                 PollForSourceChanges: 'true'
                 S3ObjectKey: Merlindomxwebsite.zip
               RunOrder: 1
@@ -54,7 +54,7 @@ Resources:
               OutputArtifacts:
                 - Name: web_cf_template
               Configuration:
-                S3Bucket: Merlindomx-stratalux-beanstalk
+                S3Bucket: Merlindomx-merlindomx-beanstalk
                 PollForSourceChanges: 'true'
                 S3ObjectKey: cloudformation/Merlindomxwebtestcf.zip
               RunOrder: 1
@@ -121,7 +121,7 @@ Resources:
               RunOrder: 1
       ArtifactStore:
         Type: S3
-        Location: Merlindomx-stratalux-beanstalk
+        Location: Merlindomx-merlindomx-beanstalk
       DisableInboundStageTransitions:
         - StageName: DestroyMerlindomxTestWebCi
           Reason: Disabling the transition until integration tests are completed

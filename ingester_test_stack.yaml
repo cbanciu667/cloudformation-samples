@@ -59,7 +59,7 @@ Parameters:
   CodeDeployS3Bucket:
     Description: Codedeploy Bucket Name
     Type: String
-    Default: Merlindomx-stratalux-codedeploy
+    Default: Merlindomx-merlindomx-codedeploy
   CodeDeployS3Key:
     Type: String
     Description: Code Deploy Object Key
@@ -67,7 +67,7 @@ Parameters:
   ChefS3Bucket:
     Type: String
     Description: Chef S3 source bucket
-    Default: Merlindomx-stratalux-chef
+    Default: Merlindomx-merlindomx-chef
   ChefS3Prefix:
     Type: String
     Description: Chef S3 bucket prefix
@@ -75,19 +75,19 @@ Parameters:
   ChefEnvironment:
     Type: String
     Description: Chef environment
-    Default: MerlindomxStrataluxTest
+    Default: MerlindomxmerlindomxTest
   ChefOrganization:
     Type: String
     Description: Chef organization
-    Default: strataluxtest
+    Default: merlindomxtest
   ChefRunlist:
     Type: String
     Description: Chef runlist
     Default: >-
-      "recipe[env_stratalux_Merlindomx_test]","recipe[role_Merlindomx_windows_base]"
+      "recipe[env_merlindomx_Merlindomx_test]","recipe[role_Merlindomx_windows_base]"
   StlxProjectTag:
     Type: String
-    Description: Stratalux Project Tag used for billing
+    Description: merlindomx Project Tag used for billing
     Default: MerlindomxIngester
 Mappings:
   Region2Index:
@@ -113,18 +113,18 @@ Mappings:
       hostname: Merlindomx-ing-test
   ChefEnvironment:
     prod:
-      ChefEnv: MerlindomxStrataluxProd
+      ChefEnv: MerlindomxmerlindomxProd
     test:
-      ChefEnv: MerlindomxStrataluxTest
+      ChefEnv: MerlindomxmerlindomxTest
     dev:
-      ChefEnv: MerlindomxStrataluxDevelopment
+      ChefEnv: MerlindomxmerlindomxDevelopment
   ChefEnvCookbook:
     prod:
-      ChefEnv: env_stratalux_Merlindomx_prod
+      ChefEnv: env_merlindomx_Merlindomx_prod
     test:
-      ChefEnv: env_stratalux_Merlindomx_test
+      ChefEnv: env_merlindomx_Merlindomx_test
     dev:
-      ChefEnv: env_stratalux_Merlindomx_development
+      ChefEnv: env_merlindomx_Merlindomx_development
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:

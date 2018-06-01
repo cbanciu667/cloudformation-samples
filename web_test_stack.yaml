@@ -181,7 +181,7 @@ Resources:
       ApplicationName: !Ref MerlindomxWebApplication
       Description: Merlindomx Web Application
       SourceBundle:
-        S3Bucket: Merlindomx-stratalux-beanstalk
+        S3Bucket: Merlindomx-merlindomx-beanstalk
         S3Key: Merlindomxwebsite.zip
   MerlindomxWebAppConfigurationTemplate:
     Type: 'AWS::ElasticBeanstalk::ConfigurationTemplate'

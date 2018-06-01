@@ -85,17 +85,17 @@ Resources:
     Type: 'AWS::S3::Bucket'
     Properties:
       AccessControl: Private
-      BucketName: Merlindomx-stratalux-chef
+      BucketName: Merlindomx-merlindomx-chef
   MerlindomxS3BucketBeanstalk:
     Type: 'AWS::S3::Bucket'
     Properties:
       AccessControl: Private
-      BucketName: Merlindomx-stratalux-beanstalk
+      BucketName: Merlindomx-merlindomx-beanstalk
   MerlindomxS3BucketCodedeploy:
     Type: 'AWS::S3::Bucket'
     Properties:
       AccessControl: Private
-      BucketName: Merlindomx-stratalux-codedeploy
+      BucketName: Merlindomx-merlindomx-codedeploy
   MerlindomxDevIP:
     Type: 'AWS::EC2::EIP'
     Properties:

@@ -44,7 +44,7 @@ Resources:
               OutputArtifacts:
                 - Name: prod_app
               Configuration:
-                S3Bucket: Merlindomx-stratalux-codedeploy
+                S3Bucket: Merlindomx-merlindomx-codedeploy
                 PollForSourceChanges: 'true'
                 S3ObjectKey: ready_to_deploy/Merlindomxjobs.zip
               RunOrder: 1
@@ -58,7 +58,7 @@ Resources:
               OutputArtifacts:
                 - Name: Merlindomx_prod_stack
               Configuration:
-                S3Bucket: Merlindomx-stratalux-codedeploy
+                S3Bucket: Merlindomx-merlindomx-codedeploy
                 PollForSourceChanges: 'true'
                 S3ObjectKey: cloudformation/Merlindomxingestercf.zip
               RunOrder: 1

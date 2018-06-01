@@ -80,8 +80,8 @@ Resources:
                   - 's3:PutObject'
                 Effect: Allow
                 Resource:
-                  - 'arn:aws:s3:::Merlindomx-stratalux-*'
-                  - 'arn:aws:s3:::Merlindomx-stratalux-*/*'
+                  - 'arn:aws:s3:::Merlindomx-merlindomx-*'
+                  - 'arn:aws:s3:::Merlindomx-merlindomx-*/*'
                   - 'arn:aws:s3:::elasticbeanstalk-*'
                   - 'arn:aws:s3:::elasticbeanstalk-*/*'
               - Action:
@@ -171,8 +171,8 @@ Resources:
                   - 's3:PutObject'
                 Effect: Allow
                 Resource:
-                  - 'arn:aws:s3:::Merlindomx-stratalux-*'
-                  - 'arn:aws:s3:::Merlindomx-stratalux-*/*'
+                  - 'arn:aws:s3:::Merlindomx-merlindomx-*'
+                  - 'arn:aws:s3:::Merlindomx-merlindomx-*/*'
                   - 'arn:aws:s3:::elasticbeanstalk-*'
                   - 'arn:aws:s3:::elasticbeanstalk-*/*'
               - Action:
@@ -238,8 +238,8 @@ Resources:
                   - 's3:PutObject'
                 Effect: Allow
                 Resource:
-                  - 'arn:aws:s3:::Merlindomx-stratalux-*'
-                  - 'arn:aws:s3:::Merlindomx-stratalux-*/*'
+                  - 'arn:aws:s3:::Merlindomx-merlindomx-*'
+                  - 'arn:aws:s3:::Merlindomx-merlindomx-*/*'
                   - 'arn:aws:s3:::elasticbeanstalk-*'
                   - 'arn:aws:s3:::elasticbeanstalk-*/*'
               - Action:
