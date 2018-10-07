@@ -57,6 +57,12 @@ Parameters:
     Description: Domain Name
     Type: String
     Default: bcosmin.net
+  DomainZoneId:
+    Type: String
+    MinLength: 10
+    MaxLength: 30
+    Default: Z1067LNA7NZJ1K
+    Description: Domain Zone ID
   IAMStackName:
     Description: Iam Stack Name
     Type: String
@@ -980,6 +986,28 @@ Resources:
               mode: '000400'
               owner: root
               group: root
+          /etc/awslogs/awslogs.conf:
+              content: !Sub |
+                [general]
+                state_file = /var/awslogs/state/agent-state
+
+                [/var/log/syslog]
+                file = /var/log/syslog
+                log_group_name = ${AWS::StackName}-/var/log/syslog
+                log_stream_name = ${AWS::StackName}-{instance_id}
+                datetime_format = %b %d %H:%M:%S
+
+                [/var/log/openvpn.log]
+                file = /var/log/openvpn.log
+                log_group_name = ${AWS::StackName}-/var/log/openvpn.log
+                log_stream_name = ${AWS::StackName}-{instance_id}
+                datetime_format = %b %d %H:%M:%S
+
+                [/var/log/chef/client.log]
+                file = /var/log/chef/client.log
+                log_group_name = ${AWS::StackName}-/var/log/chef/client.log
+                log_stream_name = ${AWS::StackName}-{instance_id}
+                datetime_format = %b %d %H:%M:%S
     Properties:
       InstanceType:
         Ref: MgmtInstanceAType
@@ -1300,3 +1328,10 @@ Outputs:
     Export:
       Name:
         Fn::Sub: ${AWS::StackName}-DNSDomain
+  DNSDomainId:
+    Description: DNS Domain Id
+    Value:
+      Ref: DomainZoneId
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-DNSDomainId
