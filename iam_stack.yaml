@@ -1,187 +1,11 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: Merlindomx IAM Stack v1.2.0
+Description: bcosmin.net - IAM stack - v1.2.0
 Parameters: {}
 Mappings: {}
 Metadata: {}
 Conditions: {}
 Resources:
-  MerlindomxCodePipelineRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - codepipeline.amazonaws.com
-            Action:
-              - 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/AmazonRDSFullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonEC2FullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonVPCReadOnlyAccess'
-        - 'arn:aws:iam::aws:policy/AWSElasticBeanstalkFullAccess'
-        - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
-        - 'arn:aws:iam::aws:policy/AWSLambdaFullAccess'
-      Path: /
-      Policies:
-        - PolicyName: !Join
-            - ''
-            - - MerlindomxCodePipelineEc2InstancePolicy
-              - !Ref 'AWS::StackName'
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - 'codedeploy:CreateDeployment'
-                  - 'codedeploy:GetApplicationRevision'
-                  - 'codedeploy:GetDeployment'
-                  - 'codedeploy:GetDeploymentConfig'
-                  - 'codedeploy:RegisterApplicationRevision'
-                  - 'elasticloadbalancing:DescribeInstanceHealth'
-                  - 'elasticloadbalancing:DescribeLoadBalancers'
-                  - 'elasticloadbalancing:DescribeTargetHealth'
-                  - 'autoscaling:DescribeAutoScalingGroups'
-                  - 'autoscaling:DescribeLaunchConfigurations'
-                  - 'autoscaling:DescribeScalingActivities'
-                  - 'autoscaling:ResumeProcesses'
-                  - 'autoscaling:SuspendProcesses'
-                  - 'elasticloadbalancing:DescribeLoadBalancers'
-                  - 'sns:ListSubscriptionsByTopic'
-                  - 'sqs:GetQueueAttributes'
-                  - 'sqs:GetQueueUrl'
-                  - 'autoscaling:DescribeAutoScalingGroups'
-                  - 'autoscaling:DescribeAutoScalingInstances'
-                  - 'autoscaling:DescribeScalingActivities'
-                  - 'autoscaling:DescribeNotificationConfigurations'
-                  - 'cloudformation:GetTemplate'
-                  - 'cloudformation:DescribeStackResource'
-                  - 'cloudformation:DescribeStackResources'
-                  - 'cloudformation:DescribeStackEvents'
-                  - 'cloudformation:CreateStack'
-                  - 'cloudformation:DeleteStack'
-                  - 'cloudformation:DescribeStacks'
-                  - 'cloudformation:UpdateStack'
-                  - 'cloudformation:CreateChangeSet'
-                  - 'cloudformation:DeleteChangeSet'
-                  - 'cloudformation:DescribeChangeSet'
-                  - 'cloudformation:ExecuteChangeSet'
-                  - 'cloudformation:SetStackPolicy'
-                  - 'cloudformation:ValidateTemplate'
-                  - 'iam:PassRole'
-                Resource:
-                  - '*'
-              - Action:
-                  - 's3:Get*'
-                  - 's3:List*'
-                  - 's3:PutObject'
-                Effect: Allow
-                Resource:
-                  - 'arn:aws:s3:::Merlindomx-merlindomx-*'
-                  - 'arn:aws:s3:::Merlindomx-merlindomx-*/*'
-                  - 'arn:aws:s3:::elasticbeanstalk-*'
-                  - 'arn:aws:s3:::elasticbeanstalk-*/*'
-              - Action:
-                  - 's3:PutObject'
-                Resource:
-                  - 'arn:aws:s3:::codepipeline*'
-                  - 'arn:aws:s3:::elasticbeanstalk*'
-                Effect: Allow
-  MerlindomxCodePipelineCFRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - cloudformation.amazonaws.com
-            Action:
-              - 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/AmazonRDSFullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonEC2FullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonVPCReadOnlyAccess'
-        - 'arn:aws:iam::aws:policy/AWSElasticBeanstalkFullAccess'
-        - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
-        - 'arn:aws:iam::aws:policy/AWSLambdaFullAccess'
-      Path: /
-      Policies:
-        - PolicyName: !Join
-            - ''
-            - - MerlindomxCodePipelineEc2InstancePolicy
-              - !Ref 'AWS::StackName'
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - 'codedeploy:CreateDeployment'
-                  - 'codedeploy:GetApplicationRevision'
-                  - 'codedeploy:GetDeployment'
-                  - 'codedeploy:GetDeploymentConfig'
-                  - 'codedeploy:RegisterApplicationRevision'
-                  - 'elasticloadbalancing:DescribeInstanceHealth'
-                  - 'elasticloadbalancing:DescribeLoadBalancers'
-                  - 'elasticloadbalancing:DescribeTargetHealth'
-                  - 'autoscaling:DescribeAutoScalingGroups'
-                  - 'autoscaling:DescribeLaunchConfigurations'
-                  - 'autoscaling:DescribeScalingActivities'
-                  - 'autoscaling:ResumeProcesses'
-                  - 'autoscaling:SuspendProcesses'
-                  - 'elasticloadbalancing:DescribeLoadBalancers'
-                  - 'sns:ListSubscriptionsByTopic'
-                  - 'sqs:GetQueueAttributes'
-                  - 'sqs:GetQueueUrl'
-                  - 'autoscaling:DescribeAutoScalingGroups'
-                  - 'autoscaling:DescribeAutoScalingInstances'
-                  - 'autoscaling:DescribeScalingActivities'
-                  - 'autoscaling:DescribeNotificationConfigurations'
-                  - 'cloudformation:GetTemplate'
-                  - 'cloudformation:DescribeStackResource'
-                  - 'cloudformation:DescribeStackResources'
-                  - 'cloudformation:DescribeStackEvents'
-                  - 'cloudformation:CreateStack'
-                  - 'cloudformation:DeleteStack'
-                  - 'cloudformation:DescribeStacks'
-                  - 'cloudformation:UpdateStack'
-                  - 'cloudformation:CreateChangeSet'
-                  - 'cloudformation:DeleteChangeSet'
-                  - 'cloudformation:DescribeChangeSet'
-                  - 'cloudformation:ExecuteChangeSet'
-                  - 'cloudformation:SetStackPolicy'
-                  - 'cloudformation:ValidateTemplate'
-                  - 'codepipeline:UpdatePipeline'
-                  - 'codepipeline:CreatePipeline'
-                  - 'codepipeline:DeletePipeline'
-                  - 'codepipeline:GetPipeline'
-                  - 'codepipeline:GetPipelineState'
-                  - 'codedeploy:*'
-                  - 'iam:PassRole'
-                Resource:
-                  - '*'
-              - Action:
-                  - 's3:Get*'
-                  - 's3:List*'
-                  - 's3:PutObject'
-                Effect: Allow
-                Resource:
-                  - 'arn:aws:s3:::Merlindomx-merlindomx-*'
-                  - 'arn:aws:s3:::Merlindomx-merlindomx-*/*'
-                  - 'arn:aws:s3:::elasticbeanstalk-*'
-                  - 'arn:aws:s3:::elasticbeanstalk-*/*'
-              - Action:
-                  - 's3:PutObject'
-                Resource:
-                  - 'arn:aws:s3:::codepipeline*'
-                  - 'arn:aws:s3:::elasticbeanstalk*'
-                Effect: Allow
-  MerlindomxLambdaRole:
+  LambdaRole:
     Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
@@ -196,11 +20,10 @@ Resources:
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AmazonVPCFullAccess'
         - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
-        - 'arn:aws:iam::aws:policy/AWSCodePipelineFullAccess'
         - 'arn:aws:iam::aws:policy/AWSLambdaExecute'
       Path: /
       Policies: []
-  MerlindomxInstanceRole:
+  VPNInstanceRole:
     Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
@@ -210,130 +33,276 @@ Resources:
             Principal:
               Service:
                 - ec2.amazonaws.com
-                - codepipeline.amazonaws.com
-                - cloudformation.amazonaws.com
-                - elasticbeanstalk.amazonaws.com
-                - codedeploy.amazonaws.com
             Action:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/AmazonRDSFullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonEC2FullAccess'
         - 'arn:aws:iam::aws:policy/AmazonVPCReadOnlyAccess'
-        - 'arn:aws:iam::aws:policy/AWSElasticBeanstalkFullAccess'
-        - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
         - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
       Path: /
       Policies:
         - PolicyName: !Join
             - ''
-            - - MerlindomxEc2InstancePolicy
+            - - VPNInstancePolicy
               - !Ref 'AWS::StackName'
           PolicyDocument:
             Version: 2012-10-17
             Statement:
               - Action:
-                  - 's3:Get*'
-                  - 's3:List*'
-                  - 's3:PutObject'
+                  - 's3:*Get*'
+                  - 's3:*List*'
+                  - 's3:*Put*'
                 Effect: Allow
                 Resource:
-                  - 'arn:aws:s3:::Merlindomx-merlindomx-*'
-                  - 'arn:aws:s3:::Merlindomx-merlindomx-*/*'
-                  - 'arn:aws:s3:::elasticbeanstalk-*'
-                  - 'arn:aws:s3:::elasticbeanstalk-*/*'
+                  - 'arn:aws:s3:::bcosmin-net-data/*'
+                  - 'arn:aws:s3:::bcosmin-net-logs/*'
+                  - 'arn:aws:s3:::bcosmin-net-data'
+                  - 'arn:aws:s3:::bcosmin-net-logs'
+                  - 'arn:aws:s3:::bcosmin-net-config/*'
+                  - 'arn:aws:s3:::bcosmin-net-config'
               - Action:
                   - 'cloudwatch:PutMetricData'
                 Effect: Allow
                 Resource: '*'
               - Action:
-                  - 'sqs:ChangeMessageVisibility'
-                  - 'sqs:DeleteMessage'
-                  - 'sqs:ReceiveMessage'
-                  - 'sqs:SendMessage'
-                Effect: Allow
-                Resource: '*'
-              - Effect: Allow
-                Action:
-                  - 'ecs:Poll'
-                  - 'ecs:StartTask'
-                  - 'ecs:StopTask'
-                  - 'ecs:DiscoverPollEndpoint'
-                  - 'ecs:StartTelemetrySession'
-                  - 'ecs:RegisterContainerInstance'
-                  - 'ecs:DeregisterContainerInstance'
-                  - 'ecs:DescribeContainerInstances'
-                  - 'ecs:Submit*'
-                Resource: '*'
-              - Effect: Allow
-                Action:
                   - 'logs:PutLogEvents'
                   - 'logs:CreateLogStream'
+                  - 'logs:CreateLogGroup'
                   - 'logs:DescribeLogStreams'
                   - 'logs:DescribeLogGroups'
                 Resource:
-                  - 'arn:aws:logs:*:*:log-group:/aws/elasticbeanstalk*'
-              - Effect: Allow
-                Action:
-                  - 'elasticloadbalancing:DescribeInstanceHealth'
-                  - 'elasticloadbalancing:DescribeLoadBalancers'
-                  - 'elasticloadbalancing:DescribeTargetHealth'
+                  - '*'
+                Effect: Allow
+              - Action:
                   - 'ec2:DescribeInstances'
                   - 'ec2:DescribeInstanceStatus'
                   - 'ec2:GetConsoleOutput'
                   - 'ec2:AssociateAddress'
                   - 'ec2:DescribeAddresses'
                   - 'ec2:DescribeSecurityGroups'
-                  - 'sqs:GetQueueAttributes'
-                  - 'sqs:GetQueueUrl'
-                  - 'autoscaling:DescribeAutoScalingGroups'
-                  - 'autoscaling:DescribeAutoScalingInstances'
-                  - 'autoscaling:DescribeScalingActivities'
-                  - 'autoscaling:DescribeNotificationConfigurations'
+                  - 'ec2:CreateSnapshot'
+                  - 'ec2:DeleteSnapshot'
+                  - 'ec2:DescribeVolumes'
+                  - 'ec2:DescribeSnapshots'
+                  - 'ec2:CreateTags'
+                Effect: Allow
                 Resource:
                   - '*'
-  MerlindomxInstanceProfile:
+  VPNInstanceProfile:
     Type: 'AWS::IAM::InstanceProfile'
     Properties:
       Path: /
       Roles:
-        - !Ref MerlindomxInstanceRole
+        - !Ref VPNInstanceRole
+  WPInstanceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
+      Path: /
+      Policies:
+        - PolicyName: !Join
+            - ''
+            - - WPInstancePolicy
+              - !Ref 'AWS::StackName'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 's3:*Get*'
+                  - 's3:*List*'
+                  - 's3:*Put*'
+                Effect: Allow
+                Resource:
+                  - 'arn:aws:s3:::bcosmin-net-data/*'
+                  - 'arn:aws:s3:::bcosmin-net-logs/*'
+                  - 'arn:aws:s3:::bcosmin-net-data'
+                  - 'arn:aws:s3:::bcosmin-net-logs'
+              - Action:
+                  - 's3:*Get*'
+                  - 's3:*List*'
+                Effect: Allow
+                Resource:
+                  - 'arn:aws:s3:::bcosmin-net-config/*'
+                  - 'arn:aws:s3:::bcosmin-net-config'
+              - Action:
+                  - 'cloudwatch:PutMetricData'
+                Effect: Allow
+                Resource: '*'
+              - Action:
+                  - 'logs:PutLogEvents'
+                  - 'logs:CreateLogStream'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:DescribeLogStreams'
+                  - 'logs:DescribeLogGroups'
+                Resource:
+                  - '*'
+                Effect: Allow
+              - Action:
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeInstanceStatus'
+                  - 'ec2:GetConsoleOutput'
+                  - 'ec2:AssociateAddress'
+                  - 'ec2:DescribeAddresses'
+                  - 'ec2:DescribeSecurityGroups'
+                  - 'ec2:CreateSnapshot'
+                  - 'ec2:DeleteSnapshot'
+                  - 'ec2:DescribeVolumes'
+                  - 'ec2:DescribeSnapshots'
+                  - 'ec2:CreateTags'
+                Effect: Allow
+                Resource:
+                  - '*'
+  WPInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref WPInstanceRole
+  CDeployInstanceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+                - codedeploy.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
+      Path: /
+      Policies:
+        - PolicyName: !Join
+            - ''
+            - - CDeployInstancePolicy
+              - !Ref 'AWS::StackName'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 's3:*Get*'
+                  - 's3:*List*'
+                  - 's3:*Put*'
+                Effect: Allow
+                Resource:
+                  - 'arn:aws:s3:::bcosmin-net-codedeploy/*'
+                  - 'arn:aws:s3:::bcosmin-net-logs/*'
+                  - 'arn:aws:s3:::bcosmin-net-codedeploy'
+                  - 'arn:aws:s3:::bcosmin-net-logs'
+              - Action:
+                  - 's3:*Get*'
+                  - 's3:*List*'
+                Effect: Allow
+                Resource:
+                  - 'arn:aws:s3:::bcosmin-net-config/*'
+                  - 'arn:aws:s3:::bcosmin-net-config'
+              - Action:
+                  - 'cloudwatch:PutMetricData'
+                Effect: Allow
+                Resource: '*'
+              - Action:
+                  - 'logs:PutLogEvents'
+                  - 'logs:CreateLogStream'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:DescribeLogStreams'
+                  - 'logs:DescribeLogGroups'
+                Resource:
+                  - '*'
+                Effect: Allow
+              - Action:
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeInstanceStatus'
+                  - 'ec2:GetConsoleOutput'
+                  - 'ec2:AssociateAddress'
+                  - 'ec2:DescribeAddresses'
+                  - 'ec2:DescribeSecurityGroups'
+                  - 'ec2:CreateSnapshot'
+                  - 'ec2:DeleteSnapshot'
+                  - 'ec2:DescribeVolumes'
+                  - 'ec2:DescribeSnapshots'
+                  - 'ec2:CreateTags'
+                  - 'elasticloadbalancing:*'
+                  - 'autoscaling:*'
+                Effect: Allow
+                Resource:
+                  - '*'
+  CDeployInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref CDeployInstanceRole
 Outputs:
-  MerlindomxInstanceProfile:
-    Description: Merlindomx Instance Profile
-    Value: !Ref MerlindomxInstanceProfile
+  VPNInstanceProfile:
+    Description: VPN Instance Profile
+    Value: !Ref VPNInstanceProfile
     Export:
-      Name: !Sub '${AWS::StackName}-MerlindomxInstanceProfile'
-  MerlindomxInstanceRoleArn:
-    Description: Merlindomx Instance Role ARN
+      Name: !Sub '${AWS::StackName}-VPNInstanceProfile'
+  VPNInstanceRoleArn:
+    Description: VPN Instance Role ARN
     Value: !GetAtt
-      - MerlindomxInstanceRole
+      - VPNInstanceRole
       - Arn
     Export:
-      Name: !Sub '${AWS::StackName}-MerlindomxInstanceRoleArn'
-  MerlindomxInstanceRole:
-    Description: Merlindomx Instance Role
-    Value: !Ref MerlindomxInstanceRole
+      Name: !Sub '${AWS::StackName}-VPNInstanceRoleArn'
+  VPNInstanceRole:
+    Description: VPN Instance Role
+    Value: !Ref VPNInstanceRole
     Export:
-      Name: !Sub '${AWS::StackName}-MerlindomxInstanceRole'
-  MerlindomxCodePipelineRoleArn:
-    Description: Merlindomx CodePipeline Role ARN
+      Name: !Sub '${AWS::StackName}-VPNInstanceRole'
+  WPInstanceProfile:
+    Description: WP Instance Profile
+    Value: !Ref WPInstanceProfile
+    Export:
+      Name: !Sub '${AWS::StackName}-WPInstanceProfile'
+  WPInstanceRoleArn:
+    Description: WP Instance Role ARN
     Value: !GetAtt
-      - MerlindomxCodePipelineRole
+      - WPInstanceRole
       - Arn
     Export:
-      Name: !Sub '${AWS::StackName}-MerlindomxCodePipelineRoleArn'
-  MerlindomxCodePipelineCFRoleArn:
-    Description: Merlindomx CodePipeline CF Role ARN
+      Name: !Sub '${AWS::StackName}-WPInstanceRoleArn'
+  WPInstanceRole:
+    Description: WP Instance Role
+    Value: !Ref WPInstanceRole
+    Export:
+      Name: !Sub '${AWS::StackName}-WPInstanceRole'
+  CDeployInstanceProfile:
+    Description: CDeploy Instance Profile
+    Value: !Ref CDeployInstanceProfile
+    Export:
+      Name: !Sub '${AWS::StackName}-CDeployInstanceProfile'
+  CDeployInstanceRoleArn:
+    Description: CDeploy Instance Role ARN
     Value: !GetAtt
-      - MerlindomxCodePipelineCFRole
+      - CDeployInstanceRole
       - Arn
     Export:
-      Name: !Sub '${AWS::StackName}-MerlindomxCodePipelineCFRoleArn'
-  MerlindomxLambdaRoleArn:
-    Description: Merlindomx Lambda Role ARN
+      Name: !Sub '${AWS::StackName}-CDeployInstanceRoleArn'
+  CDeployInstanceRole:
+    Description: CDeploy Instance Role
+    Value: !Ref CDeployInstanceRole
+    Export:
+      Name: !Sub '${AWS::StackName}-CDeployInstanceRole'
+  LambdaRoleArn:
+    Description: bcosmin.net Lambda Role ARN
     Value: !GetAtt
-      - MerlindomxLambdaRole
+      - LambdaRole
       - Arn
     Export:
-      Name: !Sub '${AWS::StackName}-MerlindomxLambdaRoleArn'
+      Name: !Sub '${AWS::StackName}-LambdaRoleArn'

@@ -174,8 +174,6 @@ Resources:
         - PropagateAtLaunch: 'True'
           Key: Name
           Value: !Join
-            - .
-            - - !Join
                 - ''
                 - - !Ref Environment
                   - '-Merlindomx-'
@@ -252,7 +250,7 @@ Resources:
 
             - </script>
     Metadata:
-      'AWS::CloudFormation::Init':
+      AWS::CloudFormation::Init:
         config:
           files:
             'C:\cfn\cfn-hup.conf':

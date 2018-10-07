@@ -1,398 +1,488 @@
-AWSTemplateFormatVersion: 2010-09-09
-Description: Merlindomx Base VPC v1.2.0
+AWSTemplateFormatVersion: '2010-09-09'
+Description: bcosmin.net - VPC Stack - v1.2.0
 Parameters:
-  Customer:
-    Description: Customer Name
+  Project:
+    Description: Project Name
     Type: String
     MinLength: '1'
-    MaxLength: '30'
-    Default: MerlindomxMerlindomxTest
-  ProjectTag:
-    Type: String
-    Description: Merlindomx Project Tag used for billing
-    Default: MerlindomxMerlindomxTest
+    MaxLength: '20'
+    Default: bcosmin.net
   Environment:
     Description: VPC environment
     Type: String
     MinLength: '1'
-    MaxLength: '4'
-    Default: test
+    MaxLength: '20'
+    Default: prod
     AllowedValues:
       - prod
       - dev
-      - test
-    ConstraintDescription: 'Can contain only contain prod, dev or test.'
+    ConstraintDescription: Can contain only contain 'prod' or 'dev'
   KeyName:
-    Description: Name of an existing EC2 KeyPair to enable SSH access to instances
-    Type: 'AWS::EC2::KeyPair::KeyName'
-    ConstraintDescription: Must be the name of an existing EC2 KeyPair
-  VPNInstanceType:
-    Description: VPN EC2 instance type
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+    Type: String
+    Default: id_rsa_cos
+    MinLength: '1'
+    MaxLength: '64'
+    AllowedPattern: '[-_ a-zA-Z0-9]*'
+    ConstraintDescription: can contain only alphanumeric characters, spaces, dashes
+      and underscores.
+  ConfigS3Bucket:
+    Description: Name of an existing S3 bucket used for secrets
+    Type: String
+    Default: bcosmin-net-config
+    MinLength: '1'
+    MaxLength: '25'
+    AllowedPattern: '[-a-zA-Z0-9]*'
+    ConstraintDescription: can contain only alphanumeric characters and dashes.
+  VPNChefEnv:
+    Description: Chef environment for VPN instance
+    Type: String
+    Default: cos_linux_env
+  VPNChefRunlist:
+    Description: Chef runlist for VPN instance
+    Type: String
+    Default: '"recipe[cos_linux_base]","recipe[cos_openvpn]"'
+  MgmtInstanceAType:
+    Description: NAT EC2 instance type
     Type: String
     AllowedValues:
-      - t2.small
-      - t2.medium
-      - t2.large
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+      - t3.xlarge
     ConstraintDescription: must be a valid EC2 instance type.
-    Default: t2.small
-  VPNIamInstanceProfile:
-    Description: Existing VPN IAM Instance Profile
+    Default: t3.small
+  DomainName:
+    Description: Domain Name
     Type: String
-    ConstraintDescription: Must be the name of an existing IAM InstanceProfile
-    Default: >-
-      MerlindomxEssentials-Iam-1UT8X61CB625A-MerlindomxMonitoringIamInstanceProfile-1NEE0VKHMIZGZ
-  DNSDomain:
-    Description: DNS Domain for current environment
+    Default: bcosmin.net
+  IAMStackName:
+    Description: Iam Stack Name
     Type: String
-    Default: Merlindomxtest.Merlindomx.net
-  ATTENTION:
-    Description: >-
-      !!! Make sure CIDR blocks do not exist in another Merlindomx account or region
-      !!!
-    Type: String
-    Default: >-
-      Check URL:
-      https://URL/VPCs+IP+allocation+table
-  VPCSubnets:
-    Description: >-
-      Comma-delimited list of three UNIQUE CIDR blocks for prod, dev and test.
-      Respect order.
-    Type: CommaDelimitedList
-    Default: '10.227.0.0/21, 10.228.0.0/21, 10.229.0.0/21'
-  Public1ASubnets:
-    Description: >-
-      Comma-delimited list of three UNIQUE CIDR blocks for prod, dev and test
-      Respect order.
-    Type: CommaDelimitedList
-    Default: '10.227.0.0/26, 10.228.0.64/26, 10.229.0.128/26'
-  Public1BSubnets:
-    Description: >-
-      Comma-delimited list of three UNIQUE CIDR blocks for prod, dev and test
-      Respect order.
-    Type: CommaDelimitedList
-    Default: '10.227.1.0/26, 10.228.1.64/26, 10.229.1.128/26'
-  Public1CSubnets:
-    Description: >-
-      Comma-delimited list of three UNIQUE CIDR blocks for prod, dev and test
-      Respect order.
-    Type: CommaDelimitedList
-    Default: '10.227.2.0/26, 10.228.2.64/26, 10.229.2.128/26'
-  Private1ASubnets:
-    Description: >-
-      Comma-delimited list of three UNIQUE CIDR blocks for prod, dev and test
-      Respect order.
-    Type: CommaDelimitedList
-    Default: '10.227.3.0/26, 10.228.3.64/26, 10.229.3.128/26'
-  Private1BSubnets:
-    Description: >-
-      Comma-delimited list of three UNIQUE CIDR blocks for prod, dev and test
-      Respect order.
-    Type: CommaDelimitedList
-    Default: '10.227.4.0/26, 10.228.4.64/26, 10.229.4.128/26'
-  Private1CSubnets:
-    Description: >-
-      Comma-delimited list of three CIDR blocks for prod, dev and test Respect
-      order.
-    Type: CommaDelimitedList
-    Default: '10.227.5.0/26, 10.228.5.64/26, 10.229.5.128/26'
+    Default: bcosmin-net-iam
   PeeringId1:
-    Description: VPC ID for VPC Peer 1 (Optional)
+    Description: 'VPC Peering #1 ID'
     Type: String
     Default: ''
   PeerVpcCidr1:
-    Description: VPC CIDR address for VPC Peer 1 (Optional)
+    Description: VPC Peer1 Cidr
     Type: String
     Default: ''
-Conditions:
-  isProd: !Equals
-    - !Ref Environment
-    - prod
-  isDev: !Equals
-    - !Ref Environment
-    - dev
-  isTest: !Equals
-    - !Ref Environment
-    - test
-  hasPeering1: !And
-    - !Not
-      - !Equals
-        - !Ref PeeringId1
-        - ''
-    - !Not
-      - !Equals
-        - !Ref PeerVpcCidr1
-        - ''
-Mappings:
-  Region2AWSNATAMI:
-    us-east-1:
-      NATAMI: ami-8d7655f7
-    us-east-2:
-      NATAMI: ami-fc3b1199
-    us-west-1:
-      NATAMI: ami-394e4c59
-    us-west-2:
-      NATAMI: ami-35d6664d
-    eu-west-1:
-      NATAMI: ami-a136a9d8
-    eu-west-2:
-      NATAMI: ami-87312ae3
-  Region2MerlindomxVPNAMI:
-    us-east-1:
-      VPNAMI: ami-0d406277
-    us-east-2:
-      VPNAMI: ami-d30a20b6
-    us-west-1:
-      VPNAMI: ami-4a4d4f2a
-    us-west-2:
-      VPNAMI: ami-ec77c194
-    eu-west-1:
-      VPNAMI: ami-844ed0fd
-    eu-west-2:
-      VPNAMI: ami-692c370d
-  Env2Index:
-    prod:
-      ENV: '0'
-    dev:
-      ENV: '1'
-    test:
-      ENV: '2'
-  Env2Names:
-    prod:
-      Suffix: ''
-    dev:
-      Suffix: ''
-    test:
-      Suffix: ''
+  IpsecCustomerGw1:
+    Type: String
+    Description: Customer Gateway ID
+    Default: ''
+  IpsecRemoteCidr1:
+    Type: String
+    Description: IP Address range for your existing infrastructure
+    Default: ''
+  ProjectTag:
+    Type: String
+    Description: Project Tag used for billing
+    Default: bcosmin.net
+  VPCSubnetCidr:
+    Description: VPC CIDR
+    Type: String
+    Default: 10.190.0.0/19
+  Public1ASubnetCidr:
+    Description: Public1A Subnet CIDR
+    Type: String
+    Default: 10.190.0.0/23
+  Public1BSubnetCidr:
+    Description: Public1B Subnet CIDR
+    Type: String
+    Default: 10.190.2.0/23
+  Public1CSubnetCidr:
+    Description: Public1C Subnet CIDR
+    Type: String
+    Default: 10.190.4.0/23
+  Private1ASubnetCidr:
+    Description: Private1A Subnet CIDR
+    Type: String
+    Default: 10.190.6.0/23
+  Private1BSubnetCidr:
+    Description: Private1B Subnet CIDR
+    Type: String
+    Default: 10.190.8.0/23
+  Private1CSubnetCidr:
+    Description: Private1C Subnet CIDR
+    Type: String
+    Default: 10.190.10.0/23
+
+
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
       - Label:
-          default: General VPC Settings
+          default: General Stack Settings
         Parameters:
-          - Customer
-          - ProjectTag
+          - Project
           - Environment
-          - KeyName
-          - VPNInstanceType
-          - VPNIamInstanceProfile
+          - IAMStackName
+          - ProjectTag
       - Label:
-          default: VPC Network Configuration
+          default: VPN Instance
         Parameters:
-          - DNSDomain
-          - ATTENTION
-          - VPCSubnets
-          - Public1ASubnets
-          - Public1BSubnets
-          - Public1CSubnets
-          - Private1ASubnets
-          - Private1BSubnets
-          - Private1CSubnets
+          - MgmtInstanceAType
+          - KeyName
+          - ConfigS3Bucket
+          - VPNChefEnv
+          - VPNChefRunlist
+          - NATImageId
+      - Label:
+          default: Networking Settings
+        Parameters:
+          - VPCSubnetCidr
+          - Public1ASubnetCidr
+          - Public1BSubnetCidr
+          - Public1CSubnetCidr
+          - Private1ASubnetCidr
+          - Private1BSubnetCidr
+          - Private1CSubnetCidr
+          - DomainName
           - PeeringId1
           - PeerVpcCidr1
+          - IpsecCustomerGw1
+          - IpsecRemoteCidr1
     ParameterLabels:
       VPCID:
-        default: Inputs for VPC stack creation
+        default: Inputs for VPC creation
+
+
+Conditions:
+  isDev:
+    Fn::Equals:
+      - Ref: Environment
+      - dev
+  isProd:
+    Fn::Equals:
+      - Ref: Environment
+      - prod
+  hasIpsec1:
+    Fn::Not:
+      - Fn::Equals:
+          - Ref: IpsecCustomerGw1
+          - ''
+  hasPeering1:
+    Fn::And:
+      - Fn::Not:
+          - Fn::Equals:
+              - Ref: PeeringId1
+              - ''
+      - Fn::Not:
+          - Fn::Equals:
+              - Ref: PeerVpcCidr1
+              - ''
+
+
+Mappings:
+  AWSNATAMI:
+    eu-central-1:
+      UBUNTU18AMI: ami-0bdf93799014acdc4
+    us-east-1:
+      UBUNTU18AMI: ami-0ac019f4fcb7cb7e6
+    us-west-1:
+      UBUNTU18AMI: ami-063aa838bd7631e0b
+    us-east-1:
+      UBUNTU18AMI: ami-0ac019f4fcb7cb7e6
+    us-west-2:
+      UBUNTU18AMI: ami-0bbe6b35405ecebdb
+    us-east-2:
+      UBUNTU18AMI: ami-0f65671a86f061fcd
+    eu-west-2:
+      UBUNTU18AMI: ami-0b0a60c0a2bd40612
+    eu-west-3:
+      UBUNTU18AMI: ami-08182c55a1c188dee
+    ca-central-1:
+      UBUNTU18AMI: ami-0427e8367e3770df1
+  Region2Index:
+    eu-central-1:
+      REGION: '0'
+  Env2Names:
+    prod:
+      Suffix: 'prod'
+    dev:
+      Suffix: 'dev'
+
+
+
 Resources:
-  DNSDomainZone:
-    Type: 'AWS::Route53::HostedZone'
-    Properties:
-      HostedZoneConfig:
-        Comment: Merlindomx Stack VPC - Route53 Hosted Zone
-      Name: !Ref DNSDomain
   dhcpOptions:
-    Type: 'AWS::EC2::DHCPOptions'
+    Type: AWS::EC2::DHCPOptions
     Properties:
-      DomainName: !Ref DNSDomain
+      DomainName:
+        Ref: DomainName
       DomainNameServers:
         - AmazonProvidedDNS
   DhcpOptionsAssoc:
-    Type: 'AWS::EC2::VPCDHCPOptionsAssociation'
+    Type: AWS::EC2::VPCDHCPOptionsAssociation
     Properties:
-      DhcpOptionsId: !Ref dhcpOptions
-      VpcId: !Ref VPC
+      DhcpOptionsId:
+        Ref: dhcpOptions
+      VpcId:
+        Ref: VPC
   VPC:
-    Type: 'AWS::EC2::VPC'
+    Type: AWS::EC2::VPC
     Properties:
       EnableDnsSupport: true
       EnableDnsHostnames: true
-      CidrBlock: !Select
-        - !FindInMap
-          - Env2Index
-          - !Ref Environment
-          - ENV
-        - !Ref VPCSubnets
+      CidrBlock:
+        Ref: VPCSubnetCidr
       Tags:
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref 'AWS::Region'
-              - !Ref Environment
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: AWS::Region
+                - Ref: Environment
         - Key: Application
-          Value: !Ref 'AWS::StackName'
+          Value:
+            Ref: AWS::StackName
         - Key: Network
           Value: Public
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
-  PublicSubnet1A:
-    Type: 'AWS::EC2::Subnet'
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select
-        - '0'
-        - !GetAZs ''
-      CidrBlock: !Select
-        - !FindInMap
-          - Env2Index
-          - !Ref Environment
-          - ENV
-        - !Ref Public1ASubnets
-      Tags:
-        - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - PublicSubnet1A
-        - Key: Application
-          Value: !Ref 'AWS::StackName'
-        - Key: Network
-          Value: Public
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
-  PublicSubnet1B:
-    Type: 'AWS::EC2::Subnet'
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select
-        - '1'
-        - !GetAZs ''
-      CidrBlock: !Select
-        - !FindInMap
-          - Env2Index
-          - !Ref Environment
-          - ENV
-        - !Ref Public1BSubnets
-      Tags:
-        - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - PublicSubnet1B
-        - Key: Application
-          Value: !Ref 'AWS::StackName'
-        - Key: Network
-          Value: Public
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
-  PublicSubnet1C:
-    Type: 'AWS::EC2::Subnet'
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select
-        - '2'
-        - !GetAZs ''
-      CidrBlock: !Select
-        - !FindInMap
-          - Env2Index
-          - !Ref Environment
-          - ENV
-        - !Ref Public1CSubnets
-      Tags:
-        - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - PublicSubnet1C
-        - Key: Application
-          Value: !Ref 'AWS::StackName'
-        - Key: Network
-          Value: Public
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
   InternetGateway:
-    Type: 'AWS::EC2::InternetGateway'
+    Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
         - Key: Application
-          Value: !Ref 'AWS::StackName'
+          Value:
+            Ref: AWS::StackName
         - Key: Network
           Value: Public
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
   GatewayToInternet:
-    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Type: AWS::EC2::VPCGatewayAttachment
     Properties:
-      VpcId: !Ref VPC
-      InternetGatewayId: !Ref InternetGateway
-  PublicRouteTable:
-    Type: 'AWS::EC2::RouteTable'
+      VpcId:
+        Ref: VPC
+      InternetGatewayId:
+        Ref: InternetGateway
+  IpsecVpnGw1:
+    Type: AWS::EC2::VPNGateway
+    Condition: hasIpsec1
     Properties:
-      VpcId: !Ref VPC
+      Type: ipsec.1
       Tags:
         - Key: Application
-          Value: !Ref 'AWS::StackName'
+          Value:
+            Ref: AWS::StackName
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
+  IpsecVpnGwAttachment1:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Condition: hasIpsec1
+    Properties:
+      VpcId:
+        Ref: VPC
+      VpnGatewayId:
+        Ref: IpsecVpnGw1
+  IpsecVpnConnection1:
+    Type: AWS::EC2::VPNConnection
+    Condition: hasIpsec1
+    Properties:
+      Type: ipsec.1
+      StaticRoutesOnly: 'true'
+      CustomerGatewayId:
+        Ref: IpsecCustomerGw1
+      VpnGatewayId:
+        Ref: IpsecVpnGw1
+  IpsecVpnConnection1Route1:
+    Type: AWS::EC2::VPNConnectionRoute
+    Condition: hasIpsec1
+    Properties:
+      VpnConnectionId:
+        Ref: IpsecVpnConnection1
+      DestinationCidrBlock:
+        Ref: IpsecRemoteCidr1
+  PublicSubnet1A:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      MapPublicIpOnLaunch: true
+      AvailabilityZone:
+        Fn::Select:
+          - '0'
+          - Fn::GetAZs: ''
+      CidrBlock:
+        Ref: Public1ASubnetCidr
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - PublicSubnet1A
+        - Key: Application
+          Value:
+            Ref: AWS::StackName
+        - Key: Network
+          Value: Public
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
+  PublicSubnet1B:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      MapPublicIpOnLaunch: true
+      AvailabilityZone:
+        Fn::Select:
+          - '1'
+          - Fn::GetAZs: ''
+      CidrBlock:
+        Ref: Public1BSubnetCidr
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - PublicSubnet1B
+        - Key: Application
+          Value:
+            Ref: AWS::StackName
+        - Key: Network
+          Value: Public
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
+  PublicSubnet1C:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      MapPublicIpOnLaunch: true
+      AvailabilityZone:
+        Fn::Select:
+          - '2'
+          - Fn::GetAZs: ''
+      CidrBlock:
+        Ref: Public1CSubnetCidr
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - PublicSubnet1C
+        - Key: Application
+          Value:
+            Ref: AWS::StackName
+        - Key: Network
+          Value: Public
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPC
+      Tags:
+        - Key: Application
+          Value:
+            Ref: AWS::StackName
         - Key: Network
           Value: Public
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - PublicRouteTable
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
-  PublicRoute:
-    Type: 'AWS::EC2::Route'
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - PublicRouteTable
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
+  PublicRouteDefault:
+    Type: AWS::EC2::Route
     Properties:
-      RouteTableId: !Ref PublicRouteTable
+      RouteTableId:
+        Ref: PublicRouteTable
       DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
+      GatewayId:
+        Ref: InternetGateway
   PublicRoutePeer1:
-    Type: 'AWS::EC2::Route'
+    Type: AWS::EC2::Route
     Condition: hasPeering1
     Properties:
-      RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: !Ref PeerVpcCidr1
-      VpcPeeringConnectionId: !Ref PeeringId1
+      RouteTableId:
+        Ref: PublicRouteTable
+      DestinationCidrBlock:
+        Ref: PeerVpcCidr1
+      VpcPeeringConnectionId:
+        Ref: PeeringId1
+  PublicRouteIpsecCidr1:
+    Type: AWS::EC2::Route
+    Condition: hasIpsec1
+    DependsOn: IpsecVpnGwAttachment1
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      DestinationCidrBlock:
+        Ref: IpsecRemoteCidr1
+      GatewayId:
+        Ref: IpsecVpnGw1
   PublicSubnet1ARouteTableAssociation:
-    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnet1A
-      RouteTableId: !Ref PublicRouteTable
+      SubnetId:
+        Ref: PublicSubnet1A
+      RouteTableId:
+        Ref: PublicRouteTable
   PublicSubnet1BRouteTableAssociation:
-    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnet1B
-      RouteTableId: !Ref PublicRouteTable
+      SubnetId:
+        Ref: PublicSubnet1B
+      RouteTableId:
+        Ref: PublicRouteTable
   PublicSubnet1CRouteTableAssociation:
-    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnet1C
-      RouteTableId: !Ref PublicRouteTable
+      SubnetId:
+        Ref: PublicSubnet1C
+      RouteTableId:
+        Ref: PublicRouteTable
   PublicNetworkAcl:
-    Type: 'AWS::EC2::NetworkAcl'
+    Type: AWS::EC2::NetworkAcl
     Properties:
-      VpcId: !Ref VPC
+      VpcId:
+        Ref: VPC
       Tags:
         - Key: Application
-          Value: !Ref 'AWS::StackName'
+          Value:
+            Ref: AWS::StackName
         - Key: Network
           Value: Public
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - PublicACL
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - PublicACL
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
   InboundPublicNetworkAclDefault:
-    Type: 'AWS::EC2::NetworkAclEntry'
+    Type: AWS::EC2::NetworkAclEntry
     Properties:
-      NetworkAclId: !Ref PublicNetworkAcl
+      NetworkAclId:
+        Ref: PublicNetworkAcl
       RuleNumber: '1000'
       Protocol: '-1'
       RuleAction: allow
@@ -402,9 +492,10 @@ Resources:
         From: '0'
         To: '65535'
   OutboundPublicNetworkAclDefault:
-    Type: 'AWS::EC2::NetworkAclEntry'
+    Type: AWS::EC2::NetworkAclEntry
     Properties:
-      NetworkAclId: !Ref PublicNetworkAcl
+      NetworkAclId:
+        Ref: PublicNetworkAcl
       RuleNumber: '1000'
       Protocol: '-1'
       RuleAction: allow
@@ -414,222 +505,302 @@ Resources:
         From: '0'
         To: '65535'
   PublicSubnet1ANetworkAclAssociation:
-    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Type: AWS::EC2::SubnetNetworkAclAssociation
     Properties:
-      SubnetId: !Ref PublicSubnet1A
-      NetworkAclId: !Ref PublicNetworkAcl
+      SubnetId:
+        Ref: PublicSubnet1A
+      NetworkAclId:
+        Ref: PublicNetworkAcl
   PublicSubnet1BNetworkAclAssociation:
-    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Type: AWS::EC2::SubnetNetworkAclAssociation
     Properties:
-      SubnetId: !Ref PublicSubnet1B
-      NetworkAclId: !Ref PublicNetworkAcl
+      SubnetId:
+        Ref: PublicSubnet1B
+      NetworkAclId:
+        Ref: PublicNetworkAcl
   PublicSubnet1CNetworkAclAssociation:
-    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Type: AWS::EC2::SubnetNetworkAclAssociation
     Properties:
-      SubnetId: !Ref PublicSubnet1C
-      NetworkAclId: !Ref PublicNetworkAcl
+      SubnetId:
+        Ref: PublicSubnet1C
+      NetworkAclId:
+        Ref: PublicNetworkAcl
   PrivateSubnet1A:
-    Type: 'AWS::EC2::Subnet'
+    Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select
-        - '0'
-        - !GetAZs ''
-      CidrBlock: !Select
-        - !FindInMap
-          - Env2Index
-          - !Ref Environment
-          - ENV
-        - !Ref Private1ASubnets
+      VpcId:
+        Ref: VPC
+      AvailabilityZone:
+        Fn::Select:
+          - '0'
+          - Fn::GetAZs: ''
+      CidrBlock:
+        Ref: Private1ASubnetCidr
       Tags:
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - PrivateSubnet1A
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - PrivateSubnet1A
         - Key: Application
-          Value: !Ref 'AWS::StackName'
+          Value:
+            Ref: AWS::StackName
         - Key: Network
           Value: Private
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
   PrivateSubnet1B:
-    Type: 'AWS::EC2::Subnet'
+    Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select
-        - '1'
-        - !GetAZs ''
-      CidrBlock: !Select
-        - !FindInMap
-          - Env2Index
-          - !Ref Environment
-          - ENV
-        - !Ref Private1BSubnets
+      VpcId:
+        Ref: VPC
+      AvailabilityZone:
+        Fn::Select:
+          - '1'
+          - Fn::GetAZs: ''
+      CidrBlock:
+        Ref: Private1BSubnetCidr
       Tags:
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - PrivateSubnet1B
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - PrivateSubnet1B
         - Key: Application
-          Value: !Ref 'AWS::StackName'
+          Value:
+            Ref: AWS::StackName
         - Key: Network
           Value: Private
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
   PrivateSubnet1C:
-    Type: 'AWS::EC2::Subnet'
+    Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select
-        - '2'
-        - !GetAZs ''
-      CidrBlock: !Select
-        - !FindInMap
-          - Env2Index
-          - !Ref Environment
-          - ENV
-        - !Ref Private1CSubnets
+      VpcId:
+        Ref: VPC
+      AvailabilityZone:
+        Fn::Select:
+          - '2'
+          - Fn::GetAZs: ''
+      CidrBlock:
+        Ref: Private1CSubnetCidr
       Tags:
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - PrivateSubnet1C
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - PrivateSubnet1C
         - Key: Application
-          Value: !Ref 'AWS::StackName'
+          Value:
+            Ref: AWS::StackName
         - Key: Network
           Value: Private
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
   PrivateRouteTableA:
-    Type: 'AWS::EC2::RouteTable'
+    Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref VPC
+      VpcId:
+        Ref: VPC
       Tags:
         - Key: Application
-          Value: !Ref 'AWS::StackName'
+          Value:
+            Ref: AWS::StackName
         - Key: Network
           Value: Private
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - PrivateRouteTableA
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - PrivateRouteTableA
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
   PrivateRouteTableB:
-    Type: 'AWS::EC2::RouteTable'
+    Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref VPC
+      VpcId:
+        Ref: VPC
       Tags:
         - Key: Application
-          Value: !Ref 'AWS::StackName'
+          Value:
+            Ref: AWS::StackName
         - Key: Network
           Value: Private
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - PrivateRouteTableB
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - PrivateRouteTableB
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
   PrivateRouteTableC:
-    Type: 'AWS::EC2::RouteTable'
+    Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref VPC
+      VpcId:
+        Ref: VPC
       Tags:
         - Key: Application
-          Value: !Ref 'AWS::StackName'
+          Value:
+            Ref: AWS::StackName
         - Key: Network
           Value: Private
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - PrivateRouteTableC
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - PrivateRouteTableC
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
   PrivateDefaultRouteA:
-    Type: 'AWS::EC2::Route'
+    Type: AWS::EC2::Route
     Properties:
-      RouteTableId: !Ref PrivateRouteTableA
+      RouteTableId:
+        Ref: PrivateRouteTableA
       DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NATGatewayA
+      InstanceId:
+        Ref: MgmtInstanceA
   PrivateDefaultRouteB:
-    Type: 'AWS::EC2::Route'
+    Type: AWS::EC2::Route
     Properties:
-      RouteTableId: !Ref PrivateRouteTableB
+      RouteTableId:
+        Ref: PrivateRouteTableB
       DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NATGatewayB
+      InstanceId:
+        Ref: MgmtInstanceA
   PrivateDefaultRouteC:
-    Type: 'AWS::EC2::Route'
+    Type: AWS::EC2::Route
     Properties:
-      RouteTableId: !Ref PrivateRouteTableC
+      RouteTableId:
+        Ref: PrivateRouteTableC
       DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NATGatewayC
+      InstanceId:
+        Ref: MgmtInstanceA
   PrivatePeer1RouteA:
-    Type: 'AWS::EC2::Route'
+    Type: AWS::EC2::Route
     Condition: hasPeering1
     Properties:
-      RouteTableId: !Ref PrivateRouteTableA
-      DestinationCidrBlock: !Ref PeerVpcCidr1
-      VpcPeeringConnectionId: !Ref PeeringId1
+      RouteTableId:
+        Ref: PrivateRouteTableA
+      DestinationCidrBlock:
+        Ref: PeerVpcCidr1
+      VpcPeeringConnectionId:
+        Ref: PeeringId1
   PrivatePeer1RouteB:
-    Type: 'AWS::EC2::Route'
+    Type: AWS::EC2::Route
     Condition: hasPeering1
     Properties:
-      RouteTableId: !Ref PrivateRouteTableB
-      DestinationCidrBlock: !Ref PeerVpcCidr1
-      VpcPeeringConnectionId: !Ref PeeringId1
+      RouteTableId:
+        Ref: PrivateRouteTableB
+      DestinationCidrBlock:
+        Ref: PeerVpcCidr1
+      VpcPeeringConnectionId:
+        Ref: PeeringId1
   PrivatePeer1RouteC:
-    Type: 'AWS::EC2::Route'
+    Type: AWS::EC2::Route
     Condition: hasPeering1
     Properties:
-      RouteTableId: !Ref PrivateRouteTableC
-      DestinationCidrBlock: !Ref PeerVpcCidr1
-      VpcPeeringConnectionId: !Ref PeeringId1
+      RouteTableId:
+        Ref: PrivateRouteTableC
+      DestinationCidrBlock:
+        Ref: PeerVpcCidr1
+      VpcPeeringConnectionId:
+        Ref: PeeringId1
+  PrivateARouteIpsecCidr1:
+    Type: AWS::EC2::Route
+    Condition: hasIpsec1
+    DependsOn: IpsecVpnGwAttachment1
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableA
+      DestinationCidrBlock:
+        Ref: IpsecRemoteCidr1
+      GatewayId:
+        Ref: IpsecVpnGw1
+  PrivateBRouteIpsecCidr1:
+    Type: AWS::EC2::Route
+    Condition: hasIpsec1
+    DependsOn: IpsecVpnGwAttachment1
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableB
+      DestinationCidrBlock:
+        Ref: IpsecRemoteCidr1
+      GatewayId:
+        Ref: IpsecVpnGw1
+  PrivateCRouteIpsecCidr1:
+    Type: AWS::EC2::Route
+    Condition: hasIpsec1
+    DependsOn: IpsecVpnGwAttachment1
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableC
+      DestinationCidrBlock:
+        Ref: IpsecRemoteCidr1
+      GatewayId:
+        Ref: IpsecVpnGw1
   PrivateSubnet1ARouteTableAssociation:
-    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PrivateSubnet1A
-      RouteTableId: !Ref PrivateRouteTableA
+      SubnetId:
+        Ref: PrivateSubnet1A
+      RouteTableId:
+        Ref: PrivateRouteTableA
   PrivateSubnet1BRouteTableAssociation1:
-    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PrivateSubnet1B
-      RouteTableId: !Ref PrivateRouteTableB
+      SubnetId:
+        Ref: PrivateSubnet1B
+      RouteTableId:
+        Ref: PrivateRouteTableB
   PrivateSubnet1CRouteTableAssociation1:
-    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PrivateSubnet1C
-      RouteTableId: !Ref PrivateRouteTableC
+      SubnetId:
+        Ref: PrivateSubnet1C
+      RouteTableId:
+        Ref: PrivateRouteTableC
   PrivateNetworkAcl:
-    Type: 'AWS::EC2::NetworkAcl'
+    Type: AWS::EC2::NetworkAcl
     Properties:
-      VpcId: !Ref VPC
+      VpcId:
+        Ref: VPC
       Tags:
         - Key: Application
-          Value: !Ref 'AWS::StackName'
+          Value:
+            Ref: AWS::StackName
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - PrivateACL
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - PrivateACL
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
   InboundPrivateNetworkAclDefault:
-    Type: 'AWS::EC2::NetworkAclEntry'
+    Type: AWS::EC2::NetworkAclEntry
     Properties:
-      NetworkAclId: !Ref PrivateNetworkAcl
+      NetworkAclId:
+        Ref: PrivateNetworkAcl
       RuleNumber: '1000'
       Protocol: '-1'
       RuleAction: allow
@@ -639,9 +810,10 @@ Resources:
         From: '0'
         To: '65535'
   OutBoundPrivateNetworkAclDefault:
-    Type: 'AWS::EC2::NetworkAclEntry'
+    Type: AWS::EC2::NetworkAclEntry
     Properties:
-      NetworkAclId: !Ref PrivateNetworkAcl
+      NetworkAclId:
+        Ref: PrivateNetworkAcl
       RuleNumber: '1000'
       Protocol: '-1'
       RuleAction: allow
@@ -651,279 +823,480 @@ Resources:
         From: '0'
         To: '65535'
   PrivateSubnet1ANetworkAclAssociation:
-    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Type: AWS::EC2::SubnetNetworkAclAssociation
     Properties:
-      SubnetId: !Ref PrivateSubnet1A
-      NetworkAclId: !Ref PrivateNetworkAcl
+      SubnetId:
+        Ref: PrivateSubnet1A
+      NetworkAclId:
+        Ref: PrivateNetworkAcl
   PrivateSubnet1BNetworkAclAssociation1:
-    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Type: AWS::EC2::SubnetNetworkAclAssociation
     Properties:
-      SubnetId: !Ref PrivateSubnet1B
-      NetworkAclId: !Ref PrivateNetworkAcl
+      SubnetId:
+        Ref: PrivateSubnet1B
+      NetworkAclId:
+        Ref: PrivateNetworkAcl
   PrivateSubnet1CNetworkAclAssociation1:
-    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Type: AWS::EC2::SubnetNetworkAclAssociation
     Properties:
-      SubnetId: !Ref PrivateSubnet1C
-      NetworkAclId: !Ref PrivateNetworkAcl
+      SubnetId:
+        Ref: PrivateSubnet1C
+      NetworkAclId:
+        Ref: PrivateNetworkAcl
   S3Endpoint:
-    Type: 'AWS::EC2::VPCEndpoint'
+    Type: AWS::EC2::VPCEndpoint
     Properties:
       PolicyDocument:
-        Version: 2012-10-17
+        Version: '2012-10-17'
         Statement:
           - Action: '*'
             Effect: Allow
             Resource: '*'
             Principal: '*'
       RouteTableIds:
-        - !Ref PrivateRouteTableA
-        - !Ref PrivateRouteTableB
-        - !Ref PrivateRouteTableC
-        - !Ref PublicRouteTable
-      ServiceName: !Join
-        - ''
-        - - com.amazonaws.
-          - !Ref 'AWS::Region'
-          - .s3
-      VpcId: !Ref VPC
-  NATIPAddressA:
-    Type: 'AWS::EC2::EIP'
+        - Ref: PrivateRouteTableA
+        - Ref: PrivateRouteTableB
+        - Ref: PrivateRouteTableC
+        - Ref: PublicRouteTable
+      ServiceName:
+        Fn::Join:
+          - ''
+          - - com.amazonaws.
+            - Ref: AWS::Region
+            - .s3
+      VpcId:
+        Ref: VPC
+  MgmtInstanceA:
+    Type: AWS::EC2::Instance
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          default:
+            - install_cfn
+            - chef_converge
+        chef_converge:
+          files:
+            /etc/sysctl.d/nat.conf:
+              content: !Join
+                - ''
+                - - "net.ipv4.ip_forward = 1\n"
+                  - "net.ipv4.conf.ens5.send_redirects = 0\n"
+            /etc/rc.local:
+              content: !Join
+                - ''
+                - - "#!/bin/sh\n\n"
+                  - "/sbin/iptables-restore </etc/iptables.save\n"
+                  - "exit 0\n"
+            /etc/iptables.save:
+              content: !Join
+                - ''
+                - - "\n"
+                  - "*filter\n"
+                  - ":INPUT ACCEPT [0:0]\n"
+                  - ":FORWARD ACCEPT [0:0]\n"
+                  - ":OUTPUT ACCEPT [0:0]\n"
+                  - "COMMIT\n"
+                  - "*nat\n"
+                  - ":PREROUTING ACCEPT [0:0]\n"
+                  - ":INPUT ACCEPT [0:0]\n"
+                  - ":OUTPUT ACCEPT [0:0]\n"
+                  - ":POSTROUTING ACCEPT [0:0]\n"
+                  - "-A POSTROUTING -o ens5 -j MASQUERADE\n"
+                  - "-A POSTROUTING -o tun+ -j MASQUERADE\n"
+                  - "COMMIT\n"
+          packages:
+            apt:
+              git: []
+              nano: []
+              build-essential: []
+              libffi-dev: []
+              liblz-dev: []
+              liblzma-dev: []
+              libssl-dev: []
+              libxml2: []
+              libxml2-dev: []
+              libxml2-utils: []
+              libxslt1-dev: []
+              python-dev: []
+              zlib1g-dev: []
+              openvpn: []
+              awscli: []
+              python3: []
+              ruby: []
+          commands:
+            01_set_hostname:
+              command: hostname `cat /etc/hostname`
+            02_fix_etc_hosts:
+              command: echo `curl http://169.254.169.254/latest/meta-data/local-ipv4`
+                `cat /etc/hostname` >> /etc/hosts
+            03_sysctl_forwarding:
+              command: sysctl -p /etc/sysctl.d/nat.conf
+            04_iptables:
+              command: /sbin/iptables-restore </etc/iptables.save
+            05_prepare_chef:
+              command: mkdir -p /var/log/chef; touch /var/log/chef/client.log; wget http://opscode.com/chef/install.sh
+              cwd: /tmp
+            06_install_chef:
+              command: bash install.sh -v 13.9.1
+              cwd: /tmp
+            07_get_chef_files:
+              command: !Sub 'aws s3 sync s3://${ConfigS3Bucket}/chef/ /etc/chef/  --region ${AWS::Region}'
+            08_run_chef:
+              command: !Sub 'chef-client -E ${VPNChefEnv} -r ${VPNChefRunlist} -N vpn-nat-${Environment}.${DomainName} || true'
+            09_enable_openvpn:
+              command: systemctl enable openvpn
+            10_start_openvpn:
+              command: systemctl start openvpn
+            11_sync_openvpn_creds:
+              command: !Sub 'ls /etc/openvpn/keys/*.gz | while read zip ; do aws s3 cp --region ${AWS::Region} $zip s3://${ConfigS3Bucket}/openvpnkeys/ ; done'
+        install_cfn:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Join
+                - ''
+                - - "[main]\n"
+                  - stack=
+                  - !Ref 'AWS::StackName'
+                  - "\n"
+                  - region=
+                  - !Ref 'AWS::Region'
+                  - "\n"
+              mode: '000400'
+              owner: root
+              group: root
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Join
+                - ''
+                - - "[cfn-auto-reloader-hook]\n"
+                  - "triggers=post.update\n"
+                  - "path=Resources.MgmtInstanceA.Metadata.AWS::CloudFormation::Init\n"
+                  - 'action=cfn-init -v --stack '
+                  - !Ref 'AWS::StackId'
+                  - ' --configsets default --resource MgmtInstanceA '
+                  - ' --region '
+                  - !Ref 'AWS::Region'
+                  - "\n"
+                  - "runas=root\n"
+              mode: '000400'
+              owner: root
+              group: root
     Properties:
-      Domain: vpc
-  NATGatewayA:
-    Type: 'AWS::EC2::NatGateway'
-    DependsOn: GatewayToInternet
-    Properties:
-      AllocationId: !GetAtt
-        - NATIPAddressA
-        - AllocationId
-      SubnetId: !Ref PublicSubnet1A
-  NATIPAddressB:
-    Type: 'AWS::EC2::EIP'
-    Properties:
-      Domain: vpc
-  NATGatewayB:
-    Type: 'AWS::EC2::NatGateway'
-    DependsOn: GatewayToInternet
-    Properties:
-      AllocationId: !GetAtt
-        - NATIPAddressB
-        - AllocationId
-      SubnetId: !Ref PublicSubnet1B
-  NATIPAddressC:
-    Type: 'AWS::EC2::EIP'
-    Properties:
-      Domain: vpc
-  NATGatewayC:
-    Type: 'AWS::EC2::NatGateway'
-    DependsOn: GatewayToInternet
-    Properties:
-      AllocationId: !GetAtt
-        - NATIPAddressC
-        - AllocationId
-      SubnetId: !Ref PublicSubnet1C
-  VPNIPAddressA:
-    Type: 'AWS::EC2::EIP'
-    Properties:
-      Domain: vpc
-      InstanceId: !Ref VPNHostA
-  VPNHostA:
-    Type: 'AWS::EC2::Instance'
-    Properties:
-      InstanceType: !Ref VPNInstanceType
-      IamInstanceProfile: !Ref VPNIamInstanceProfile
-      KeyName: !Ref KeyName
-      ImageId: !FindInMap
-        - Region2MerlindomxVPNAMI
-        - !Ref 'AWS::Region'
-        - VPNAMI
-      SubnetId: !Ref PublicSubnet1A
+      InstanceType:
+        Ref: MgmtInstanceAType
+      IamInstanceProfile:
+        Fn::ImportValue:
+            !Sub "${IAMStackName}-VPNInstanceProfile"
+      KeyName:
+        Ref: KeyName
+      SubnetId:
+        Ref: PublicSubnet1A
+      SourceDestCheck: 'false'
+      ImageId:
+        !FindInMap [AWSNATAMI, !Ref "AWS::Region", UBUNTU18AMI]
       SecurityGroupIds:
-        - !Ref env
-        - !Ref common
-        - !Ref vpn
+        - Ref: commonOverride
+        - Ref: common
+        - Ref: nat
+        - Ref: vpn
+      UserData: !Base64
+        Fn::Join:
+          - ''
+          - - "#!/bin/bash -xe\n"
+            - "apt-get -y update\n"
+            - "# Install prerequisites for the agents bellow. THIS USERDATA IS FOR UBUNTU 18.04 LTS ONLY\n"
+            - "apt-get -y install python python-pip python-daemon ruby equivs\n"
+            - "# Install and configure AWS CLI and AWS-CFN-BOOTSTRAP.\n"
+            - "pip install -U setuptools\n"
+            - "pip install awscli\n"
+            - "wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.4-30.tar.gz\n"
+            - "tar xvzf aws-cfn-bootstrap-1.4-30.tar.gz\n"
+            - "cd aws-cfn-bootstrap-1.4\n"
+            - "python setup.py install\n"
+            - "# Make sure SSM AGENT is enabled and started.\n"
+            - "systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service\n"
+            - "systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service\n"
+            - "systemctl status snap.amazon-ssm-agent.amazon-ssm-agent.service\n"
+            - "# Install AWS LOGS AGENT.\n"
+            - "wget https://s3.amazonaws.com/aws-cloudwatch/downloads/latest/awslogs-agent-setup.py\n"
+            - !Sub "python awslogs-agent-setup.py -n -r ${AWS::Region} -c s3://${ConfigS3Bucket}/logagent/${AWS::Region}\n"
+            - "systemctl enable awslogs\n"
+            - "systemctl start awslogs\n"
+            - "systemctl status awslogs\n"
+            - "# Install the files and packages from the metadata. Configure services.\n"
+            - 'cfn-init '
+            - ' --configsets default '
+            - ' --stack '
+            - !Ref 'AWS::StackName'
+            - ' --resource MgmtInstanceA'
+            - ' --region '
+            - !Ref 'AWS::Region'
+            - "\n"
+            - "# Start the cfn-hup service to listen for changes to CloudFormation template\n"
+            - "cfn-hup || error_exit 'Failed to start cnf-hup'\n"
+            - "# Signal the status from cfn-init\n"
+            - 'cfn-signal -e $? '
+            - ' --stack '
+            - !Ref 'AWS::StackName'
+            - ' --resource MgmtInstanceA'
+            - ' --region '
+            - !Ref 'AWS::Region'
+            - "\n"
       Tags:
         - Key: Name
-          Value: !Join
-            - ''
-            - - !Ref Environment
-              - '-vpn01'
+          Value:
+            Fn::Join:
               - .
-              - !Ref DNSDomain
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
+              - - Fn::Join:
+                    - '-'
+                    - - Ref: Environment
+                      - vpn-nat
+                - Ref: DomainName
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT2H
+
+  MgmtIPAddressA:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId:
+        Ref: MgmtInstanceA
+
   nat:
-    Type: 'AWS::EC2::SecurityGroup'
+    Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Enable internal access to the NAT device
-      VpcId: !Ref VPC
+      VpcId:
+        Ref: VPC
       Tags:
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - nat
-        - Key: 'Merlindomx:project'
-          Value: !Ref ProjectTag
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - nat
+        - Key: bcosmin-net:project
+          Value:
+            Ref: ProjectTag
       SecurityGroupIngress:
         - IpProtocol: '-1'
           FromPort: '0'
           ToPort: '65535'
-          SourceSecurityGroupId: !Ref common
+          SourceSecurityGroupId:
+            Ref: common
       SecurityGroupEgress:
         - IpProtocol: '-1'
           FromPort: '0'
           ToPort: '65535'
           CidrIp: 0.0.0.0/0
-  env:
-    Type: 'AWS::EC2::SecurityGroup'
+  commonOverride:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Central environment group used for overrides
-      VpcId: !Ref VPC
+      GroupDescription: Common security group used for global overrides
+      VpcId:
+        Ref: VPC
       Tags:
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - env
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - commonOverride
       SecurityGroupIngress: []
   common:
-    Type: 'AWS::EC2::SecurityGroup'
+    Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Common environment settings
-      VpcId: !Ref VPC
+      VpcId:
+        Ref: VPC
       Tags:
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - common
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - common
       SecurityGroupIngress:
         - IpProtocol: '-1'
           FromPort: '0'
           ToPort: '65535'
-          SourceSecurityGroupId: !Ref vpn
-  commonIngressFromZabbix:
-    Type: 'AWS::EC2::SecurityGroupIngress'
+          SourceSecurityGroupId:
+            Ref: vpn
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 86.125.124.0/22
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: 0.0.0.0/0
+  commonIngressFromIpsecRemoteCidr1:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: hasIpsec1
     Properties:
-      GroupId: !Ref common
-      IpProtocol: tcp
-      FromPort: '10050'
-      ToPort: '10051'
-      SourceSecurityGroupId: !Ref vpn
+      GroupId:
+        Ref: common
+      IpProtocol: '-1'
+      FromPort: '0'
+      ToPort: '65535'
+      CidrIp:
+        Ref: IpsecRemoteCidr1
+  commonIngressFromPeeringId1:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: hasPeering1
+    Properties:
+      GroupId:
+        Ref: common
+      IpProtocol: '-1'
+      FromPort: '0'
+      ToPort: '65535'
+      CidrIp:
+        Ref: PeerVpcCidr1
   vpn:
-    Type: 'AWS::EC2::SecurityGroup'
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: VPN servers
-      VpcId: !Ref VPC
+      GroupDescription: OpenVPN servers
+      VpcId:
+        Ref: VPC
       Tags:
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref Customer
-              - !Ref Environment
-              - vpn
+          Value:
+            Fn::Join:
+              - '-'
+              - - Ref: Project
+                - Ref: Environment
+                - vpn
       SecurityGroupIngress:
         - IpProtocol: udp
           FromPort: '1194'
           ToPort: '1194'
           CidrIp: 0.0.0.0/0
-  vpnIngressZabbixFromCommon:
-    Type: 'AWS::EC2::SecurityGroupIngress'
+  CloudWatchLogsGroup:
+    Type: AWS::Logs::LogGroup
     Properties:
-      GroupId: !Ref vpn
-      IpProtocol: tcp
-      FromPort: '10050'
-      ToPort: '10051'
-      SourceSecurityGroupId: !Ref common
-  vpnIngressOssecSrvFromCommon:
-    Type: 'AWS::EC2::SecurityGroupIngress'
-    Properties:
-      GroupId: !Ref vpn
-      IpProtocol: udp
-      FromPort: '1514'
-      ToPort: '1514'
-      SourceSecurityGroupId: !Ref common
-  vpnIngressOssecAuthFromCommon:
-    Type: 'AWS::EC2::SecurityGroupIngress'
-    Properties:
-      GroupId: !Ref vpn
-      IpProtocol: tcp
-      FromPort: '1515'
-      ToPort: '1515'
-      SourceSecurityGroupId: !Ref common
+        LogGroupName: !Ref AWS::StackName
+        RetentionInDays: 30
 Outputs:
-  VPCId:
+  VPC:
     Description: VPC ID
-    Value: !Ref VPC
+    Value:
+      Ref: VPC
     Export:
-      Name: !Sub '${AWS::StackName}-VPC'
-  Route53ZoneId:
-    Description: Merlindomx Base VPC Route53 Zone ID
-    Value: !Ref DNSDomainZone
-    Export:
-      Name: !Sub '${AWS::StackName}-DNSDomainZone'
-  DNSDomain:
-    Description: Merlindomx Base VPC Route53 Domain
-    Value: !Ref DNSDomain
-    Export:
-      Name: !Sub '${AWS::StackName}-DNSDomain'
+      Name:
+        Fn::Sub: ${AWS::StackName}-VPC
   PrivateSubnet1A:
     Description: PrivateSubnet1A
-    Value: !Ref PrivateSubnet1A
+    Value:
+      Ref: PrivateSubnet1A
     Export:
-      Name: !Sub '${AWS::StackName}-PrivateSubnet1A'
+      Name:
+        Fn::Sub: ${AWS::StackName}-PrivateSubnet1A
   PrivateSubnet1B:
     Description: PrivateSubnet1B
-    Value: !Ref PrivateSubnet1B
+    Value:
+      Ref: PrivateSubnet1B
     Export:
-      Name: !Sub '${AWS::StackName}-PrivateSubnet1B'
+      Name:
+        Fn::Sub: ${AWS::StackName}-PrivateSubnet1B
   PrivateSubnet1C:
     Description: PrivateSubnet1C
-    Value: !Ref PrivateSubnet1C
+    Value:
+      Ref: PrivateSubnet1C
     Export:
-      Name: !Sub '${AWS::StackName}-PrivateSubnet1C'
+      Name:
+        Fn::Sub: ${AWS::StackName}-PrivateSubnet1C
   PublicSubnet1A:
     Description: PublicSubnet1A
-    Value: !Ref PublicSubnet1A
+    Value:
+      Ref: PublicSubnet1A
     Export:
-      Name: !Sub '${AWS::StackName}-PublicSubnet1A'
+      Name:
+        Fn::Sub: ${AWS::StackName}-PublicSubnet1A
   PublicSubnet1B:
     Description: PublicSubnet1B
-    Value: !Ref PublicSubnet1B
+    Value:
+      Ref: PublicSubnet1B
     Export:
-      Name: !Sub '${AWS::StackName}-PublicSubnet1B'
+      Name:
+        Fn::Sub: ${AWS::StackName}-PublicSubnet1B
   PublicSubnet1C:
     Description: PublicSubnet1C
-    Value: !Ref PublicSubnet1C
+    Value:
+      Ref: PublicSubnet1C
     Export:
-      Name: !Sub '${AWS::StackName}-PublicSubnet1C'
+      Name:
+        Fn::Sub: ${AWS::StackName}-PublicSubnet1C
   common:
     Description: common security group ID
-    Value: !GetAtt
-      - common
-      - GroupId
+    Value:
+      Fn::GetAtt:
+        - common
+        - GroupId
     Export:
-      Name: !Sub '${AWS::StackName}-common'
-  env:
+      Name:
+        Fn::Sub: ${AWS::StackName}-common
+  commonOverride:
     Description: env security env ID
-    Value: !GetAtt
-      - env
-      - GroupId
+    Value:
+      Fn::GetAtt:
+        - commonOverride
+        - GroupId
     Export:
-      Name: !Sub '${AWS::StackName}-env'
+      Name:
+        Fn::Sub: ${AWS::StackName}-env
   vpn:
     Description: vpn security group ID
-    Value: !GetAtt
-      - vpn
-      - GroupId
+    Value:
+      Fn::GetAtt:
+        - vpn
+        - GroupId
     Export:
-      Name: !Sub '${AWS::StackName}-vpn'
-  ProjectTag:
-    Description: Project Tagging for billing purposes
-    Value: !Ref ProjectTag
+      Name:
+        Fn::Sub: ${AWS::StackName}-vpn
+  nat:
+    Description: nat security group ID
+    Value:
+      Fn::GetAtt:
+        - nat
+        - GroupId
     Export:
-      Name: !Sub '${AWS::StackName}-ProjectTag'
+      Name:
+        Fn::Sub: ${AWS::StackName}-nat
+  PublicRouteTable:
+    Description: PublicRouteTable ID
+    Value:
+      Ref: PublicRouteTable
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-PublicRouteTable
+  PrivateRouteTableA:
+    Description: PrivateRouteTableA ID
+    Value:
+      Ref: PrivateRouteTableA
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-PrivateRouteTableA
+  PrivateRouteTableB:
+    Description: PrivateRouteTableB ID
+    Value:
+      Ref: PrivateRouteTableB
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-PrivateRouteTableB
+  PrivateRouteTableC:
+    Description: PrivateRouteTableC ID
+    Value:
+      Ref: PrivateRouteTableC
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-PrivateRouteTableC
+  DNSDomain:
+    Description: DNS Domain
+    Value:
+      Ref: DomainName
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-DNSDomain

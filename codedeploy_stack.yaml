@@ -1,0 +1,551 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: bcosmin.net - CodeDeploy stack - v1.2.0
+Parameters:
+  VpcStackName:
+    Description: VPC Stack Name.
+    Type: String
+    Default: bcosmin-net-vpc
+  DBStackName:
+    Description: DB Stack Name.
+    Type: String
+    Default: bcosmin-net-rds
+  IAMStackName:
+    Description: IAM Stack Name.
+    Type: String
+    Default: bcosmin-net-iam
+  Environment:
+    Description: VPC Environment
+    Type: String
+    MinLength: 1
+    MaxLength: 4
+    Default: prod
+    AllowedValues:
+      - prod
+      - dev
+    ConstraintDescription: can contain only contain prod or dev.
+  Identifier:
+    Type: String
+    Default: blue
+    Description: Launch deployment stack (blue/green)
+  MinInstances:
+    Type: Number
+    Default: '1'
+    Description: AutoScaling Min Capacity
+  MaxInstances:
+    Type: Number
+    Default: '5'
+    Description: AutoScaling Max Capacity
+  DesiredCapacity:
+    Type: Number
+    Default: '2'
+    Description: AutoScaling Desired Capacity
+  InstanceType:
+    Description: NAT EC2 instance type
+    Type: String
+    AllowedValues:
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to instances
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair
+  CodeDeployS3Bucket:
+    Description: Codedeploy Bucket Name
+    Type: String
+    Default: bcosmin-net-codedeploy
+  CodeDeployS3Key:
+    Type: String
+    Description: Code Deploy Object Key
+    Default: cdeploywebapp.zip
+  ChefS3Bucket:
+    Type: String
+    Description: Chef S3 source bucket
+    Default: bcosmin-net-config
+  ChefEnvironment:
+    Type: String
+    Description: Chef environment
+    Default: cos_linux_env
+  ChefRunlist:
+    Type: String
+    Description: Chef runlist
+    Default: "recipe[cos_linux_base]"
+  ProjectTag:
+    Type: String
+    Description: merlindomx Project Tag used for billing
+    Default: bcosmin-net-cdeploy
+  DomainZoneId:
+    Type: String
+    MinLength: 10
+    MaxLength: 30
+    Default: Z1067LNA7NZJ1K
+    Description: Domain Zone ID
+  Route53Weight:
+    Type: Number
+    Description: Weight for Route53 entry
+    Default: 0
+  AlbCertificateArn:
+    Description: Alb SSL Certificate ARN
+    Type: String
+    Default: arn:aws:acm:eu-central-1:446832184041:certificate/7f51a153-0f13-4118-9b55-5e9d9cefb697
+
+
+
+Mappings:
+  AMI:
+    eu-central-1:
+      UBUNTU18AMI: ami-0bdf93799014acdc4
+    us-east-1:
+      UBUNTU18AMI: ami-0ac019f4fcb7cb7e6
+    us-west-1:
+      UBUNTU18AMI: ami-063aa838bd7631e0b
+    us-east-1:
+      UBUNTU18AMI: ami-0ac019f4fcb7cb7e6
+    us-west-2:
+      UBUNTU18AMI: ami-0bbe6b35405ecebdb
+    us-east-2:
+      UBUNTU18AMI: ami-0f65671a86f061fcd
+    eu-west-2:
+      UBUNTU18AMI: ami-0b0a60c0a2bd40612
+    eu-west-3:
+      UBUNTU18AMI: ami-08182c55a1c188dee
+    ca-central-1:
+      UBUNTU18AMI: ami-0427e8367e3770df1
+  Region2Index:
+    eu-central-1:
+      REGION: '0'
+  Env2Names:
+    prod:
+      Suffix: prod
+    dev:
+      Suffix: dev
+
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: General Stack Settings
+        Parameters:
+          - VpcStackName
+          - DBStackName
+          - IAMStackName
+          - Environment
+          - Identifier
+          - ProjectTag
+          - AlbCertificateArn
+          - DomainZoneId
+          - Route53Weight
+      - Label:
+          default: CodeDeploy Configuration
+        Parameters:
+          - MinInstances
+          - MaxInstances
+          - DesiredCapacity
+          - InstanceType
+          - KeyName
+          - CodeDeployS3Bucket
+          - CodeDeployS3Key
+      - Label:
+          default: Chef Configuration
+        Parameters:
+          - ChefS3Bucket
+          - ChefEnvironment
+          - ChefRunlist
+    ParameterLabels:
+      VPCID:
+        default: Inputs for CodeDeploy layer creation
+
+
+Conditions: {}
+
+
+Resources:
+  AutoScalingGroup:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    Properties:
+      VPCZoneIdentifier:
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-PrivateSubnet1A'
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-PrivateSubnet1B'
+        - !ImportValue
+          'Fn::Sub': '${VpcStackName}-PrivateSubnet1C'
+      LaunchConfigurationName: !Ref AsgLaunchConfig
+      TargetGroupARNs:
+        - !Ref AlbTargetGroup
+      MinSize: !Ref MinInstances
+      MaxSize: !Ref MaxInstances
+      DesiredCapacity: !Ref DesiredCapacity
+      HealthCheckGracePeriod: '900'
+      MetricsCollection:
+        - Granularity: 1Minute
+      Tags:
+        - PropagateAtLaunch: 'True'
+          Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref Environment
+              - !Ref 'AWS::StackName'
+              - !Ref Identifier
+        - PropagateAtLaunch: 'True'
+          Key: Identifier
+          Value: !Ref Identifier
+        - PropagateAtLaunch: 'True'
+          Key: Domain
+          Value: !ImportValue
+            Fn::Sub: '${VpcStackName}-DNSDomain'
+        - PropagateAtLaunch: 'True'
+          Key: Environment
+          Value: !Ref Environment
+        - PropagateAtLaunch: 'True'
+          Key: CodeDeployGroup
+          Value: !Join
+            - '-'
+            - - !Ref Environment
+              - !Ref 'AWS::StackName'
+              - !Ref Identifier
+        - PropagateAtLaunch: 'True'
+          Key: ':project'
+          Value: !Ref ProjectTag
+        - PropagateAtLaunch: 'True'
+          Key: 'Scope'
+          Value: 'Autoscalling Group'
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: !Ref MinInstances
+        MaxBatchSize: '1'
+        WaitOnResourceSignals: 'True'
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT30M
+  AsgLaunchConfig:
+    Type: 'AWS::AutoScaling::LaunchConfiguration'
+    Properties:
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !ImportValue
+        Fn::Sub: '${IAMStackName}-CDeployInstanceProfile'
+      KeyName: !Ref KeyName
+      AssociatePublicIpAddress: 'False'
+      ImageId: !FindInMap [AMI, !Ref "AWS::Region", UBUNTU18AMI]
+      SecurityGroups:
+        - !ImportValue
+          Fn::Sub: '${VpcStackName}-common'
+        - !ImportValue
+          Fn::Sub: '${VpcStackName}-env'
+      UserData: !Base64
+        Fn::Join:
+          - ''
+          - - "#!/bin/bash -xe\n"
+            - "apt-get -y update\n"
+            - "# Install prerequisites for the agents bellow. THIS USERDATA IS FOR UBUNTU 18.04 LTS ONLY\n"
+            - "apt-get -y install python python-pip python-daemon ruby equivs\n"
+            - "# Install and configure AWS CLI and AWS-CFN-BOOTSTRAP.\n"
+            - "pip install awscli\n"
+            - "wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.4-30.tar.gz\n"
+            - "tar xvzf aws-cfn-bootstrap-1.4-30.tar.gz\n"
+            - "cd aws-cfn-bootstrap-1.4\n"
+            - "python setup.py install\n"
+            - "# Install and configure CODE DEPLOY AGENT. Check: https://github.com/aws/aws-codedeploy-agent/issues/158\n"
+            - !Sub "wget https://aws-codedeploy-${AWS::Region}.s3.amazonaws.com/latest/install\n"
+            - "chmod +x ./install\n"
+            - "chmod 755 install\n"
+            - "equivs-control ruby2.3.control\n"
+            - "perl -pi -e 's{^Package.*}{Package: ruby2.3}' ruby2.3.control\n"
+            - "equivs-build ruby2.3.control\n"
+            - "dpkg -i ruby2.3_1.0_all.deb\n"
+            - "perl -pi -e \"s{\\\\['2.4', '2.3', '2.2', '2.1', '2.0'\\\\]}{['2.5', '2.4', '2.3', '2.2', '2.1', '2.0']}\" install\n"
+            - "./install auto\n"
+            - "systemctl enable codedeploy-agent\n"
+            - "systemctl start codedeploy-agent\n"
+            - "systemctl status codedeploy-agent\n"
+            - "# Make sure SSM AGENT is enabled and started.\n"
+            - "systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service\n"
+            - "systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service\n"
+            - "systemctl status snap.amazon-ssm-agent.amazon-ssm-agent.service\n"
+            - "# Install AWS LOGS AGENT.\n"
+            - "wget https://s3.amazonaws.com/aws-cloudwatch/downloads/latest/awslogs-agent-setup.py\n"
+            - !Sub "python awslogs-agent-setup.py -n -r ${AWS::Region} -c s3://${ChefS3Bucket}/logagent/${AWS::StackName}\n"
+            - "systemctl enable awslogs\n"
+            - "systemctl start awslogs\n"
+            - "systemctl status awslogs\n"
+            - "##### \n"
+            - "# Install the files and packages from the metadata. Configure services.\n"
+            - "##### \n"
+            - 'cfn-init '
+            - ' --stack '
+            - !Ref 'AWS::StackName'
+            - ' --resource AsgLaunchConfig'
+            - ' --region '
+            - !Ref 'AWS::Region'
+            - "\n"
+            - "# Start the cfn-hup service to listen for changes to CloudFormation template\n"
+            - "cfn-hup || error_exit 'Failed to start cnf-hup'\n"
+            - "# Signal the status from cfn-init\n"
+            - 'cfn-signal -e $? '
+            - ' --stack '
+            - !Ref 'AWS::StackName'
+            - ' --resource AutoScalingGroup'
+            - ' --region '
+            - !Ref 'AWS::Region'
+            - "\n"
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Join
+                - ''
+                - - "[main]\n"
+                  - stack=
+                  - !Ref 'AWS::StackName'
+                  - "\n"
+                  - region=
+                  - !Ref 'AWS::Region'
+                  - "\n"
+              mode: '000400'
+              owner: root
+              group: root
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Join
+                - ''
+                - - "[cfn-auto-reloader-hook]\n"
+                  - "triggers=post.update\n"
+                  - "path=Resources.AsgLaunchConfig.Metadata.AWS::CloudFormation::Init\n"
+                  - 'action=cfn-init -v --stack '
+                  - !Ref 'AWS::StackId'
+                  - ' --resource AsgLaunchConfig '
+                  - ' --region '
+                  - !Ref 'AWS::Region'
+                  - "\n"
+                  - "runas=root\n"
+              mode: '000400'
+              owner: root
+              group: root
+          /etc/awslogs/awslogs.conf:
+              content: !Sub |
+                [general]
+                state_file = /var/awslogs/state/agent-state
+
+                [/var/log/syslog]
+                file = /var/log/syslog
+                log_group_name = ${AWS::StackName}-/var/log/syslog
+                log_stream_name = ${AWS::StackName}-{instance_id}
+                datetime_format = %b %d %H:%M:%S
+
+                [/var/log/chef/client.log]
+                file = /var/log/chef/client.log
+                log_group_name = ${AWS::StackName}-/var/log/syslog
+                log_stream_name = ${AWS::StackName}-{instance_id}
+                datetime_format = %b %d %H:%M:%S
+          commands:
+            01_set_hostname:
+              command: hostname `cat /etc/hostname`
+            02_fix_etc_hosts:
+              command: echo `curl http://169.254.169.254/latest/meta-data/local-ipv4`
+                       `cat /etc/hostname` >> /etc/hosts
+            03_prepare_chef:
+              command: mkdir -p /var/log/chef; touch /var/log/chef/client.log; wget http://opscode.com/chef/install.sh
+              cwd: /tmp
+            04_install_chef:
+              command: bash install.sh -v 13.9.1
+              cwd: /tmp
+            05_get_chef_files:
+              command: !Sub 'aws s3 sync s3://${ChefS3Bucket}/chef/ /etc/chef/  --region ${AWS::Region}'
+            06_run_chef:
+              command: !Sub 'chef-client -E ${ChefEnvironment} -r ${ChefRunlist} || true'
+
+  CPUAlarmHigh:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmDescription: Scale-up if CPU > 80% for 5 minutes
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: '300'
+      EvaluationPeriods: '1'
+      Threshold: '80'
+      AlarmActions:
+        - !Ref ServerScaleUpPolicy
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref AutoScalingGroup
+      ComparisonOperator: GreaterThanThreshold
+  CPUAlarmLow:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmDescription: Scale-down if CPU <30% for 5 min
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: '300'
+      EvaluationPeriods: '1'
+      Threshold: '30'
+      AlarmActions:
+        - !Ref ServerScaleDownPolicy
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref AutoScalingGroup
+      ComparisonOperator: LessThanThreshold
+  ServerScaleUpPolicy:
+    Type: 'AWS::AutoScaling::ScalingPolicy'
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      Cooldown: '60'
+      ScalingAdjustment: '1'
+  ServerScaleDownPolicy:
+    Type: 'AWS::AutoScaling::ScalingPolicy'
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      Cooldown: '60'
+      ScalingAdjustment: '-1'
+  BCosminNetApp:
+    Type: 'AWS::CodeDeploy::Application'
+    DependsOn: AutoScalingGroup
+  BcosminNetDeploymentGroup:
+    Type: 'AWS::CodeDeploy::DeploymentGroup'
+    DependsOn: BCosminNetApp
+    Properties:
+      AutoScalingGroups:
+        - !Ref AutoScalingGroup
+      ApplicationName: !Ref BCosminNetApp
+      Deployment:
+        Description: BCosminNet Deployment
+        IgnoreApplicationStopFailures: 'true'
+        Revision:
+          RevisionType: S3
+          S3Location:
+            Bucket: !Ref CodeDeployS3Bucket
+            BundleType: Zip
+            Key: !Ref CodeDeployS3Key
+      ServiceRoleArn: !ImportValue
+        Fn::Sub: '${IAMStackName}-CDeployInstanceRoleArn'
+  LoadBalancer:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Properties:
+          Name: !Join
+            - '-'
+            - - albcdeploy
+              - !Ref Environment
+              - !Ref Identifier
+          Subnets:
+              - !ImportValue
+                'Fn::Sub': '${VpcStackName}-PublicSubnet1A'
+              - !ImportValue
+                'Fn::Sub': '${VpcStackName}-PublicSubnet1B'
+              - !ImportValue
+                'Fn::Sub': '${VpcStackName}-PublicSubnet1C'
+          Scheme: internet-facing
+          SecurityGroups:
+              - !ImportValue
+                Fn::Sub: '${VpcStackName}-common'
+              - !ImportValue
+                Fn::Sub: '${VpcStackName}-env'
+          Tags:
+              - Key: Name
+                Value: !Join
+                  - '-'
+                  - - albcdeploy
+                    - !Ref Environment
+                    - !Ref Identifier
+  LoadBalancerListener443:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties:
+          LoadBalancerArn: !Ref LoadBalancer
+          Port: 443
+          Protocol: HTTPS
+          Certificates:
+            - CertificateArn: !Ref AlbCertificateArn
+          DefaultActions:
+              - Type: forward
+                TargetGroupArn: !Ref AlbTargetGroup
+  LoadBalancerListener80:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties:
+          LoadBalancerArn: !Ref LoadBalancer
+          Port: 80
+          Protocol: HTTP
+          DefaultActions:
+              - Type: forward
+                TargetGroupArn: !Ref AlbTargetGroup
+  AlbTargetGroup:
+      Type: AWS::ElasticLoadBalancingV2::TargetGroup
+      Properties:
+          Name: !Sub ${Environment}-cdeploy-${Identifier}
+          VpcId: !ImportValue
+            Fn::Sub: '${VpcStackName}-VPC'
+          Port: 80
+          Protocol: HTTP
+  CloudWatchLogsGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+        LogGroupName: !Ref AWS::StackName
+        RetentionInDays: 30
+  BGRoute53Record:
+    Type: 'AWS::Route53::RecordSet'
+    DependsOn: LoadBalancer    
+    Properties:
+      HostedZoneId: !Ref DomainZoneId
+      Comment: CNAME targeted to frontendElb for individual Blue/Green access
+      Name: !Join
+        - ''
+        - - cdeploy
+          - '-'
+          - !Ref Environment
+          - '-'
+          - !Ref Identifier
+          - .
+          - !ImportValue
+            'Fn::Sub': '${VpcStackName}-DNSDomain'
+          - .
+      Type: CNAME
+      TTL: '60'
+      ResourceRecords:
+        - !GetAtt
+          - LoadBalancer
+          - DNSName
+  WeightedRoute53Record:
+    Type: 'AWS::Route53::RecordSet'
+    DependsOn: LoadBalancer
+    Properties:
+      HostedZoneId: !Ref DomainZoneId
+      Comment: CNAME targeted to ELB for individual Blue/Green access
+      Name: !Join
+        - ''
+        - - cdeploy
+          - .
+          - !ImportValue
+            'Fn::Sub': '${VpcStackName}-DNSDomain'
+          - .
+      Type: CNAME
+      TTL: '60'
+      SetIdentifier: !Join
+        - ''
+        - - cdeploy
+          - '-'
+          - !Ref Environment
+          - '-'
+          - !Ref Identifier
+          - .
+          - !ImportValue
+            'Fn::Sub': '${VpcStackName}-DNSDomain'
+          - .
+      Weight: !Ref Route53Weight
+      ResourceRecords:
+        - !GetAtt
+          - LoadBalancer
+          - DNSName
+Outputs:
+    LoadBalancer:
+        Description: A reference to the Application Load Balancer
+        Value: !Ref LoadBalancer
+    LoadBalancerUrl:
+        Description: The URL of the LoadBalancer
+        Value: !GetAtt LoadBalancer.DNSName
+    Listener:
+        Description: A reference to a port 80 listener
+        Value: !Ref LoadBalancerListener443
