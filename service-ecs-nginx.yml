@@ -1,0 +1,417 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: bcosmin.net - ECS Nginx stack - v1.2.0
+Parameters:
+    VPC:
+        Description: The VPC that the ECS cluster is deployed to
+        Type: AWS::EC2::VPC::Id
+    VpcStackName:
+        Description: VPC Stack
+        Type: String
+        Default: bcosmin-net-vpc
+    IAMStackName:
+        Description: The IAM Stack
+        Type: String
+        Default: bcosmin-net-iam
+    Environment:
+        Description: VPC Environment
+        Type: String
+        MinLength: 1
+        MaxLength: 4
+        Default: prod
+        AllowedValues:
+          - prod
+          - dev
+        ConstraintDescription: can contain only contain prod or dev.
+    Identifier:
+        Type: String
+        Default: blue
+        Description: Launch deployment stack (blue/green)
+    Cluster:
+        Description: Please provide the ECS Cluster ID that this service should run on
+        Type: String
+        Default: bcosminnet
+    DesiredCount:
+        Description: How many instances of this task should we run across our cluster?
+        Type: Number
+        Default: 2
+    MaxCount:
+        Description: Maximum number of instances of this task we can run across our cluster
+        Type: Number
+        Default: 4
+    RegistryURL:
+        Description: The ECR Docker Registry URI
+        Type: String
+        Default: nginx
+    BuildTag:
+        Description: The Docker Tag
+        Type: String
+        Default: 1.15
+    ContainerName:
+        Description: Container Name
+        Type: String
+        Default: nginx
+    ConfigS3Bucket:
+        Description: S3 Bucket containing the app parameters
+        Type: String
+        Default: bcosmin-net-config
+    ConfigS3Prefix:
+        Description: S3 Object containing the app parameters
+        Type: String
+        Default: bcosmin-net-config/app
+    ApplicationFQDN:
+        Description: The app FQDN to register with the Application Load Balancer
+        Type: String
+        Default: nginx-example.bcosmin.net
+    DNSDomain:
+        Description: DNS Domain
+        Type: String
+        Default: bcosmin.net
+    AlbCertificateArn:
+        Description: Alb SSL Certificate ARN
+        Type: String
+        Default: arn:aws:acm:eu-central-1:446832184041:certificate/7f51a153-0f13-4118-9b55-5e9d9cefb697
+    Priority:
+        Description: Integer representing the priority in the Load BAlancer Listener rules
+        Type: Number
+        Default: 1
+    Route53Weight:
+      Type: Number
+      Description: Weight for Route53 entry
+      Default: 0
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: General Stack Settings
+        Parameters:
+          - VPC
+          - VpcStackName
+          - IAMStackName
+          - Environment
+          - Identifier
+          - AlbCertificateArn
+          - Route53Weight
+          - DNSDomain
+      - Label:
+          default: ECS Configuration
+        Parameters:
+          - Cluster
+          - MaxCount
+          - DesiredCount
+          - RegistryURL
+          - BuildTag
+          - ContainerName
+          - ConfigS3Bucket
+          - ConfigS3Prefix
+          - ApplicationFQDN
+          - Priority
+    ParameterLabels:
+      VPCID:
+        default: Inputs for ECS Nginx layer creation
+
+
+Resources:
+    ListenerRule:
+        Type: AWS::ElasticLoadBalancingV2::ListenerRule
+        Properties:
+            ListenerArn: !Ref LoadBalancerListener443
+            Priority: !Ref Priority
+            Conditions:
+                - Field: host-header
+                  Values:
+                    - !Ref ApplicationFQDN
+            Actions:
+                - TargetGroupArn: !Ref TargetGroup
+                  Type: forward
+    Service:
+        Type: AWS::ECS::Service
+        DependsOn: ListenerRule
+        Properties:
+            Cluster: !Ref Cluster
+            Role: !Ref ServiceRole
+            DesiredCount: !Ref DesiredCount
+            TaskDefinition: !Ref TaskDefinition
+            HealthCheckGracePeriodSeconds: 120
+            LoadBalancers:
+                - ContainerName: !Ref ContainerName
+                  ContainerPort: 80
+                  TargetGroupArn: !Ref TargetGroup
+    TaskDefinition:
+        Type: AWS::ECS::TaskDefinition
+        Properties:
+            Family: !Ref ContainerName
+            ContainerDefinitions:
+                - Name: !Ref ContainerName
+                  Essential: true
+                  Image: !Sub "${RegistryURL}:${BuildTag}"
+                  Memory: 256
+                  Environment:
+                    - Name: AWS_REGION
+                      Value: !Ref AWS::Region
+                    - Name: CONFIG_S3_BUCKET
+                      Value: !Ref ConfigS3Bucket
+                    - Name: CONFIG_S3_PREFIX
+                      Value: !Ref ConfigS3Prefix
+                  PortMappings:
+                    - ContainerPort: 80
+                  LogConfiguration:
+                    LogDriver: awslogs
+                    Options:
+                        awslogs-group: !Ref AWS::StackName
+                        awslogs-region: !Ref AWS::Region
+
+    CloudWatchLogsGroup:
+        Type: AWS::Logs::LogGroup
+        Properties:
+            LogGroupName: !Ref AWS::StackName
+            RetentionInDays: 3
+
+    TargetGroup:
+        Type: AWS::ElasticLoadBalancingV2::TargetGroup
+        Properties:
+            Tags:
+              - Key: Name
+                Value: !Sub "${Cluster}-${ContainerName}-${Priority}"
+            VpcId: !Ref VPC
+            Port: 80
+            Protocol: HTTP
+            Matcher:
+                HttpCode: 200
+            TargetGroupAttributes:
+            - Key: deregistration_delay.timeout_seconds
+              Value: '10'
+            HealthCheckIntervalSeconds: 10
+            HealthCheckPath: /
+            HealthCheckProtocol: HTTP
+            HealthCheckTimeoutSeconds: 5
+            HealthyThresholdCount: 2
+
+    ServiceRole:
+        Type: AWS::IAM::Role
+        Properties:
+            RoleName: !Sub ecs-service-${AWS::StackName}
+            Path: /
+            AssumeRolePolicyDocument: |
+                {
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Principal": { "Service": [ "ecs.amazonaws.com" ]},
+                        "Action": [ "sts:AssumeRole" ]
+                    }]
+                }
+            Policies:
+                -
+                  PolicyName: !Sub ecs-service-${AWS::StackName}
+                  PolicyDocument:
+                    Version: 2012-10-17
+                    Statement:
+                       -
+                         Effect: Allow
+                         Action:
+                              - "ec2:AuthorizeSecurityGroupIngress"
+                              - "ec2:Describe*"
+                              - "elasticloadbalancing:DeregisterInstancesFromLoadBalancer"
+                              - "elasticloadbalancing:Describe*"
+                              - "elasticloadbalancing:RegisterInstancesWithLoadBalancer"
+                              - "elasticloadbalancing:DeregisterTargets"
+                              - "elasticloadbalancing:DescribeTargetGroups"
+                              - "elasticloadbalancing:DescribeTargetHealth"
+                              - "elasticloadbalancing:RegisterTargets"
+                         Resource: "*"
+                       -
+                         Effect: Allow
+                         Action: "s3:GetObject"
+                         Resource: !Sub "arn:aws:s3:::${ConfigS3Bucket}/*"
+
+    ServiceScalableTarget:
+        Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+        Properties:
+            MaxCapacity: !Ref MaxCount
+            MinCapacity: !Ref DesiredCount
+            ResourceId: !Join
+                - /
+                - - service
+                  - !Ref Cluster
+                  - !GetAtt Service.Name
+            RoleARN: !ImportValue
+              Fn::Sub: '${IAMStackName}-ECSServiceAutoScalingRoleArn'
+            ScalableDimension: ecs:service:DesiredCount
+            ServiceNamespace: ecs
+
+    ServiceScaleOutPolicy:
+        Type : "AWS::ApplicationAutoScaling::ScalingPolicy"
+        Properties:
+            PolicyName: !Sub "${Cluster}-${ContainerName}-${ApplicationFQDN}-serviceScaleOutPolicy"
+            PolicyType: StepScaling
+            ScalingTargetId: !Ref ServiceScalableTarget
+            StepScalingPolicyConfiguration:
+                AdjustmentType: ChangeInCapacity
+                Cooldown: 1800
+                MetricAggregationType: Average
+                StepAdjustments:
+                - MetricIntervalLowerBound: 0
+                  ScalingAdjustment: 1
+
+    ServiceScaleInPolicy:
+        Type : "AWS::ApplicationAutoScaling::ScalingPolicy"
+        Properties:
+            PolicyName: !Sub "${Cluster}-${ContainerName}-${ApplicationFQDN}-serviceScaleInPolicy"
+            PolicyType: StepScaling
+            ScalingTargetId: !Ref ServiceScalableTarget
+            StepScalingPolicyConfiguration:
+                AdjustmentType: ChangeInCapacity
+                Cooldown: 1800
+                MetricAggregationType: Average
+                StepAdjustments:
+                - MetricIntervalUpperBound: 0
+                  ScalingAdjustment: -1
+
+    CPUScaleOutAlarm:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+            AlarmName: !Sub "${Cluster}-${ContainerName}-${ApplicationFQDN} CPU utilization greater than 90%"
+            AlarmDescription: Alarm if cpu utilization greater than 90% of reserved cpu
+            Namespace: AWS/ECS
+            MetricName: CPUUtilization
+            Dimensions:
+            - Name: ClusterName
+              Value: !Ref Cluster
+            - Name: ServiceName
+              Value: !GetAtt Service.Name
+            Statistic: Maximum
+            Period: '60'
+            EvaluationPeriods: '3'
+            Threshold: '90'
+            ComparisonOperator: GreaterThanThreshold
+            AlarmActions:
+            - !Ref ServiceScaleOutPolicy
+
+    CPUScaleInAlarm:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+            AlarmName: !Sub "${Cluster}-${ContainerName}-${ApplicationFQDN} CPU utilization less than 70%"
+            AlarmDescription: Alarm if cpu utilization greater than 70% of reserved cpu
+            Namespace: AWS/ECS
+            MetricName: CPUUtilization
+            Dimensions:
+            - Name: ClusterName
+              Value: !Ref Cluster
+            - Name: ServiceName
+              Value: !GetAtt Service.Name
+            Statistic: Maximum
+            Period: '60'
+            EvaluationPeriods: '10'
+            Threshold: '70'
+            ComparisonOperator: LessThanThreshold
+            AlarmActions:
+            - !Ref ServiceScaleInPolicy
+
+    LoadBalancer:
+        Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+        Properties:
+            Name: !Join
+              - '-'
+              - - alb-ecs
+                - !Ref Environment
+                - !Ref Identifier
+            Subnets:
+                - !ImportValue
+                  'Fn::Sub': '${VpcStackName}-PublicSubnet1A'
+                - !ImportValue
+                  'Fn::Sub': '${VpcStackName}-PublicSubnet1B'
+                - !ImportValue
+                  'Fn::Sub': '${VpcStackName}-PublicSubnet1C'
+            Scheme: internet-facing
+            SecurityGroups:
+                - !ImportValue
+                  Fn::Sub: '${VpcStackName}-common'
+                - !ImportValue
+                  Fn::Sub: '${VpcStackName}-env'
+            Tags:
+                - Key: Name
+                  Value: !Join
+                    - '-'
+                    - - albcdeploy
+                      - !Ref Environment
+                      - !Ref Identifier
+
+    LoadBalancerListener443:
+        Type: AWS::ElasticLoadBalancingV2::Listener
+        Properties:
+            LoadBalancerArn: !Ref LoadBalancer
+            Port: 443
+            Protocol: HTTPS
+            Certificates:
+              - CertificateArn: !Ref AlbCertificateArn
+            DefaultActions:
+                - Type: forward
+                  TargetGroupArn: !Ref TargetGroup
+
+    LoadBalancerListener80:
+        Type: AWS::ElasticLoadBalancingV2::Listener
+        Properties:
+            LoadBalancerArn: !Ref LoadBalancer
+            Port: 80
+            Protocol: HTTP
+            DefaultActions:
+                - Type: forward
+                  TargetGroupArn: !Ref TargetGroup
+
+    BGRoute53Record:
+      Type: 'AWS::Route53::RecordSet'
+      DependsOn: LoadBalancer
+      Properties:
+        HostedZoneId: !ImportValue
+          'Fn::Sub': '${VpcStackName}-DNSDomainId'
+        Comment: CNAME targeted to frontendElb for individual Blue/Green access
+        Name: !Join
+          - ''
+          - - nginx-example
+            - '-'
+            - !Ref Environment
+            - '-'
+            - !Ref Identifier
+            - .
+            - !ImportValue
+              'Fn::Sub': '${VpcStackName}-DNSDomain'
+            - .
+        Type: CNAME
+        TTL: '60'
+        ResourceRecords:
+          - !GetAtt
+            - LoadBalancer
+            - DNSName
+
+    WeightedRoute53Record:
+      Type: 'AWS::Route53::RecordSet'
+      DependsOn: LoadBalancer
+      Properties:
+        HostedZoneId: !ImportValue
+          'Fn::Sub': '${VpcStackName}-DNSDomainId'
+        Comment: CNAME targeted to ELB for individual Blue/Green access
+        Name: !Join
+          - ''
+          - - nginx-example
+            - .
+            - !ImportValue
+              'Fn::Sub': '${VpcStackName}-DNSDomain'
+            - .
+        Type: CNAME
+        TTL: '60'
+        SetIdentifier: !Join
+          - ''
+          - - ecs-nginx
+            - '-'
+            - !Ref Environment
+            - '-'
+            - !Ref Identifier
+            - .
+            - !ImportValue
+              'Fn::Sub': '${VpcStackName}-DNSDomain'
+            - .
+        Weight: !Ref Route53Weight
+        ResourceRecords:
+          - !GetAtt
+            - LoadBalancer
+            - DNSName
