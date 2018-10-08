@@ -1,0 +1,476 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'bcosmin.net - Beanstalk stack - v1.2.0'
+Parameters:
+  VpcStackName:
+    Description: VPC Stack Name.
+    Type: String
+    Default: bcosmin-net-vpc
+  IAMStackName:
+    Description: IAM Stack Name.
+    Type: String
+    Default: bcosmin-net-iam
+  Environment:
+    Description: VPC Environment
+    Type: String
+    MinLength: '1'
+    MaxLength: '4'
+    Default: prod
+    AllowedValues:
+      - prod
+      - dev
+    ConstraintDescription: 'Can contain only contain prod or dev.'
+  Identifier:
+    Type: String
+    Default: blue
+    Description: Launch deployment stack (blue/green)
+  Weight:
+    Type: Number
+    Default: '0'
+    Description: Route53 record weight
+  MinInstances:
+    Type: Number
+    Default: '2'
+    Description: AutoScaling Min Capacity
+  MaxInstances:
+    Type: Number
+    Default: '3'
+    Description: AutoScaling Max Capacity
+  SslCertificateId:
+    Description: ELB Server certificate ARN
+    Default: arn:aws:acm:eu-central-1:446832184041:certificate/7f51a153-0f13-4118-9b55-5e9d9cefb697
+    Type: String
+  AutoScalingInstanceType:
+    Description: AutoScaling Instance Type
+    Type: String
+    Default: t3.small
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to instances
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair
+Mappings:
+  Region2Index:
+    eu-west-1:
+      REGION: '0'
+  Beanstalk2Route53HostedZoneId:
+    us-east-1:
+      HostedZoneId: Z117KPS5GTRQ2G
+    us-west-1:
+      HostedZoneId: Z1LQECGX5PH1X
+    us-west-2:
+      HostedZoneId: Z38NKT9BP95V3O
+    eu-west-1:
+      HostedZoneId: Z2NYPWQ7DFZAZH
+    eu-central-1:
+      HostedZoneId: Z1FRNW7UH4DEZJ
+    ap-northeast-1:
+      HostedZoneId: Z1R25G3KIG2GBW
+    ap-northeast-2:
+      HostedZoneId: Z3JE5OI70TWKCP
+    ap-southeast-1:
+      HostedZoneId: Z16FZ9L249IFLT
+    ap-southeast-2:
+      HostedZoneId: Z2PCDNR3VC2G1N
+    sa-east-1:
+      HostedZoneId: Z10X7K2B4QSOFV
+  Beanstalk2Route53InternalHostedZoneId:
+    us-east-1:
+      HostedZoneId: Z35SXDOTRQ7X7K
+  Env2Endpoint:
+    prod:
+      hostname: bcosminweb
+    dev:
+      hostname: bcosminweb
+  ASGSettings:
+    prod:
+      UpperThreshold: '50'
+      LowerThreshold: '30'
+      UpperBreachScaleIncrement: '3'
+      LowerBreachScaleIncrement: '-1'
+    dev:
+      UpperThreshold: '90'
+      LowerThreshold: '50'
+      UpperBreachScaleIncrement: '1'
+      LowerBreachScaleIncrement: '-1'
+    test:
+      UpperThreshold: '90'
+      LowerThreshold: '50'
+      UpperBreachScaleIncrement: '1'
+      LowerBreachScaleIncrement: '-1'
+  ASGLaunchConfigSettings:
+    prod:
+      RootVolumeType: gp2
+      RootVolumeSize: '50'
+    dev:
+      RootVolumeType: gp2
+      RootVolumeSize: '50'
+    test:
+      RootVolumeType: gp2
+      RootVolumeSize: '50'
+  BeanstalkUpdateSettings:
+    prod:
+      BatchSize: '50'
+      Timeout: '500'
+    dev:
+      BatchSize: '30'
+      Timeout: '500'
+    test:
+      BatchSize: '30'
+      Timeout: '500'
+  BeanstalkRollingUpdateSettings:
+    prod:
+      RollingUpdateType: Health
+      MaxBatchSize: '1'
+      PauseTime: PT2M
+      Timeout: PT6M
+    dev:
+      RollingUpdateType: Time
+      MaxBatchSize: '1'
+      PauseTime: PT2M
+      Timeout: PT6M
+    test:
+      RollingUpdateType: Time
+      MaxBatchSize: '1'
+      PauseTime: PT2M
+      Timeout: PT6M
+  BeanstalkLogSettings:
+    prod:
+      RetentionInDays: '7'
+    dev:
+      RetentionInDays: '7'
+    test:
+      RetentionInDays: '7'
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: General Stack Settings
+        Parameters:
+          - VpcStackName
+          - IAMStackName
+          - Environment
+          - Identifier
+          - Weight
+      - Label:
+          default: Beanstalk Configuration
+        Parameters:
+          - MinInstances
+          - MaxInstances
+          - SslCertificateId
+          - AutoScalingInstanceType
+          - KeyName
+    ParameterLabels:
+      VPCID:
+        default: Inputs for Web layer creation
+Conditions: {}
+Resources:
+  BCosminNetWebApplication:
+    Type: 'AWS::ElasticBeanstalk::Application'
+    Properties:
+      Description: AWS Elastic Beanstalk BCosminNet Web Application
+  BCosminNetAppVersion:
+    Type: 'AWS::ElasticBeanstalk::ApplicationVersion'
+    Properties:
+      ApplicationName: !Ref BCosminNetWebApplication
+      Description: BCosminNet Web Application
+      SourceBundle:
+        S3Bucket: bcosmin-net-beanstalk
+        S3Key: BCosminNetwebsite.zip
+  BCosminNetWebAppConfigurationTemplate:
+    Type: 'AWS::ElasticBeanstalk::ConfigurationTemplate'
+    Properties:
+      ApplicationName: !Ref BCosminNetWebApplication
+      Description: AWS ElasticBeanstalk BCosminNet Web App Configuration Template
+      SolutionStackName: 64bit Windows Server 2016 v1.2.0 running IIS 10.0
+      OptionSettings:
+        - Namespace: 'aws:elasticbeanstalk:environment'
+          OptionName: LoadBalancerType
+          Value: application
+        - Namespace: 'aws:elasticbeanstalk:environment:process:default'
+          OptionName: DeregistrationDelay
+          Value: '30'
+        - Namespace: 'aws:elasticbeanstalk:environment:process:default'
+          OptionName: HealthCheckInterval
+          Value: '10'
+        - Namespace: 'aws:elasticbeanstalk:environment:process:default'
+          OptionName: HealthCheckTimeout
+          Value: '7'
+        - Namespace: 'aws:elasticbeanstalk:environment:process:default'
+          OptionName: HealthyThresholdCount
+          Value: '5'
+        - Namespace: 'aws:elasticbeanstalk:environment:process:default'
+          OptionName: UnhealthyThresholdCount
+          Value: '5'
+        - Namespace: 'aws:elasticbeanstalk:environment:process:default'
+          OptionName: HealthCheckPath
+          Value: /
+        - Namespace: 'aws:elasticbeanstalk:environment:process:default'
+          OptionName: MatcherHTTPCode
+          Value: '200,400,302,304'
+        - Namespace: 'aws:elasticbeanstalk:application'
+          OptionName: Application Healthcheck URL
+          Value: /Account/Login?ReturnUrl=%2f
+        - Namespace: 'aws:elbv2:listener:default'
+          OptionName: ListenerEnabled
+          Value: 'true'
+        - Namespace: 'aws:elbv2:listener:443'
+          OptionName: ListenerEnabled
+          Value: 'true'
+        - Namespace: 'aws:elbv2:listener:443'
+          OptionName: Protocol
+          Value: HTTPS
+        - Namespace: 'aws:elbv2:listener:443'
+          OptionName: SSLCertificateArns
+          Value: !Ref SslCertificateId
+        - Namespace: 'aws:ec2:vpc'
+          OptionName: ELBScheme
+          Value: internal
+        - Namespace: 'aws:autoscaling:launchconfiguration'
+          OptionName: InstanceType
+          Value: !Ref AutoScalingInstanceType
+        - Namespace: 'aws:autoscaling:launchconfiguration'
+          OptionName: EC2KeyName
+          Value: !Ref KeyName
+        - Namespace: 'aws:autoscaling:launchconfiguration'
+          OptionName: IamInstanceProfile
+          Value: !ImportValue
+            'Fn::Sub': '${IAMStackName}-BeanstalkInstanceProfile'
+        - Namespace: 'aws:elasticbeanstalk:environment'
+          OptionName: ServiceRole
+          Value: !ImportValue
+            'Fn::Sub': '${IAMStackName}-BeanstalkInstanceRole'
+        - Namespace: 'aws:autoscaling:launchconfiguration'
+          OptionName: SecurityGroups
+          Value: !Join
+            - ','
+            - - !ImportValue
+                'Fn::Sub': '${VpcStackName}-common'
+              - !ImportValue
+                'Fn::Sub': '${VpcStackName}-env'
+        - Namespace: 'aws:autoscaling:launchconfiguration'
+          OptionName: RootVolumeType
+          Value: !FindInMap
+            - ASGLaunchConfigSettings
+            - !Ref Environment
+            - RootVolumeType
+        - Namespace: 'aws:autoscaling:launchconfiguration'
+          OptionName: RootVolumeSize
+          Value: !FindInMap
+            - ASGLaunchConfigSettings
+            - !Ref Environment
+            - RootVolumeSize
+        - Namespace: 'aws:elbv2:loadbalancer'
+          OptionName: SecurityGroups
+          Value: !Join
+            - ','
+            - - !ImportValue
+                'Fn::Sub': '${VpcStackName}-common'
+              - !ImportValue
+                'Fn::Sub': '${VpcStackName}-env'
+        - Namespace: 'aws:ec2:vpc'
+          OptionName: VPCId
+          Value: !ImportValue
+            'Fn::Sub': '${VpcStackName}-VPC'
+        - Namespace: 'aws:ec2:vpc'
+          OptionName: Subnets
+          Value: !Join
+            - ','
+            - - !ImportValue
+                'Fn::Sub': '${VpcStackName}-PrivateSubnet1A'
+              - !ImportValue
+                'Fn::Sub': '${VpcStackName}-PrivateSubnet1B'
+              - !ImportValue
+                'Fn::Sub': '${VpcStackName}-PrivateSubnet1C'
+        - Namespace: 'aws:ec2:vpc'
+          OptionName: ELBSubnets
+          Value: !Join
+            - ','
+            - - !ImportValue
+                'Fn::Sub': '${VpcStackName}-PrivateSubnet1A'
+              - !ImportValue
+                'Fn::Sub': '${VpcStackName}-PrivateSubnet1B'
+              - !ImportValue
+                'Fn::Sub': '${VpcStackName}-PrivateSubnet1C'
+        - Namespace: 'aws:autoscaling:asg'
+          OptionName: MinSize
+          Value: !Ref MinInstances
+        - Namespace: 'aws:autoscaling:asg'
+          OptionName: MaxSize
+          Value: !Ref MaxInstances
+        - Namespace: 'aws:autoscaling:asg'
+          OptionName: Cooldown
+          Value: '120'
+        - Namespace: 'aws:elasticbeanstalk:environment'
+          OptionName: EnvironmentType
+          Value: LoadBalanced
+        - Namespace: 'aws:autoscaling:updatepolicy:rollingupdate'
+          OptionName: RollingUpdateEnabled
+          Value: 'true'
+        - Namespace: 'aws:autoscaling:trigger'
+          OptionName: MeasureName
+          Value: CPUUtilization
+        - Namespace: 'aws:autoscaling:trigger'
+          OptionName: Statistic
+          Value: Average
+        - Namespace: 'aws:autoscaling:trigger'
+          OptionName: Unit
+          Value: Percent
+        - Namespace: 'aws:autoscaling:trigger'
+          OptionName: Period
+          Value: '1'
+        - Namespace: 'aws:autoscaling:trigger'
+          OptionName: BreachDuration
+          Value: '1'
+        - Namespace: 'aws:autoscaling:trigger'
+          OptionName: BreachDuration
+          Value: '1'
+        - Namespace: 'aws:autoscaling:trigger'
+          OptionName: UpperThreshold
+          Value: !FindInMap
+            - ASGSettings
+            - !Ref Environment
+            - UpperThreshold
+        - Namespace: 'aws:autoscaling:trigger'
+          OptionName: LowerThreshold
+          Value: !FindInMap
+            - ASGSettings
+            - !Ref Environment
+            - LowerThreshold
+        - Namespace: 'aws:autoscaling:trigger'
+          OptionName: UpperBreachScaleIncrement
+          Value: !FindInMap
+            - ASGSettings
+            - !Ref Environment
+            - UpperBreachScaleIncrement
+        - Namespace: 'aws:autoscaling:trigger'
+          OptionName: LowerBreachScaleIncrement
+          Value: !FindInMap
+            - ASGSettings
+            - !Ref Environment
+            - LowerBreachScaleIncrement
+        - Namespace: 'aws:elasticbeanstalk:command'
+          OptionName: DeploymentPolicy
+          Value: Rolling
+        - Namespace: 'aws:elasticbeanstalk:command'
+          OptionName: BatchSizeType
+          Value: Percentage
+        - Namespace: 'aws:elasticbeanstalk:command'
+          OptionName: BatchSize
+          Value: !FindInMap
+            - BeanstalkUpdateSettings
+            - !Ref Environment
+            - BatchSize
+        - Namespace: 'aws:elasticbeanstalk:command'
+          OptionName: Timeout
+          Value: !FindInMap
+            - BeanstalkUpdateSettings
+            - !Ref Environment
+            - Timeout
+        - Namespace: 'aws:autoscaling:updatepolicy:rollingupdate'
+          OptionName: RollingUpdateType
+          Value: !FindInMap
+            - BeanstalkRollingUpdateSettings
+            - !Ref Environment
+            - RollingUpdateType
+        - Namespace: 'aws:autoscaling:updatepolicy:rollingupdate'
+          OptionName: MaxBatchSize
+          Value: !FindInMap
+            - BeanstalkRollingUpdateSettings
+            - !Ref Environment
+            - MaxBatchSize
+        - Namespace: 'aws:autoscaling:updatepolicy:rollingupdate'
+          OptionName: MinInstancesInService
+          Value: !Ref MinInstances
+        - Namespace: 'aws:autoscaling:updatepolicy:rollingupdate'
+          OptionName: PauseTime
+          Value: !FindInMap
+            - BeanstalkRollingUpdateSettings
+            - !Ref Environment
+            - PauseTime
+        - Namespace: 'aws:autoscaling:updatepolicy:rollingupdate'
+          OptionName: Timeout
+          Value: !FindInMap
+            - BeanstalkRollingUpdateSettings
+            - !Ref Environment
+            - Timeout
+        - Namespace: 'aws:elasticbeanstalk:cloudwatch:logs'
+          OptionName: StreamLogs
+          Value: 'true'
+        - Namespace: 'aws:elasticbeanstalk:cloudwatch:logs'
+          OptionName: DeleteOnTerminate
+          Value: 'true'
+        - Namespace: 'aws:elasticbeanstalk:cloudwatch:logs'
+          OptionName: RetentionInDays
+          Value: !FindInMap
+            - BeanstalkLogSettings
+            - !Ref Environment
+            - RetentionInDays
+        - Namespace: 'aws:elasticbeanstalk:healthreporting:system'
+          OptionName: SystemType
+          Value: basic
+  BCosminNetWebAppBeanstalkEnvironment:
+    Type: 'AWS::ElasticBeanstalk::Environment'
+    Properties:
+      ApplicationName: !Ref BCosminNetWebApplication
+      Description: AWS Elastic Beanstalk Environment for BCosminNet Web Application
+      TemplateName: !Ref BCosminNetWebAppConfigurationTemplate
+      VersionLabel: !Ref BCosminNetAppVersion
+  BGRoute53Record:
+    Type: 'AWS::Route53::RecordSet'
+    Properties:
+      HostedZoneId: !ImportValue
+        'Fn::Sub': '${VpcStackName}-DNSDomainId'
+      Comment: CNAME targeted to frontendElb for individual Blue/Green access
+      Name: !Join
+        - ''
+        - - !FindInMap
+            - Env2Endpoint
+            - !Ref Environment
+            - hostname
+          - '-'
+          - !Ref Identifier
+          - .
+          - !ImportValue
+            'Fn::Sub': '${VpcStackName}-DNSDomain'
+          - .
+      Type: CNAME
+      TTL: '60'
+      ResourceRecords:
+        - !GetAtt
+          - BCosminNetWebAppBeanstalkEnvironment
+          - EndpointURL
+  WeightedRoute53Record:
+    Type: 'AWS::Route53::RecordSet'
+    Properties:
+      HostedZoneId: !ImportValue
+        'Fn::Sub': '${VpcStackName}-DNSDomainId'
+      Comment: CNAME targeted to ELB for individual Blue/Green access
+      Name: !Join
+        - ''
+        - - !FindInMap
+            - Env2Endpoint
+            - !Ref Environment
+            - hostname
+          - .
+          - !ImportValue
+            'Fn::Sub': '${VpcStackName}-DNSDomain'
+          - .
+      Type: CNAME
+      TTL: '60'
+      SetIdentifier: !Join
+        - ''
+        - - !FindInMap
+            - Env2Endpoint
+            - !Ref Environment
+            - hostname
+          - '-'
+          - !Ref Identifier
+          - .
+          - !ImportValue
+            'Fn::Sub': '${VpcStackName}-DNSDomain'
+          - .
+      Weight: !Ref Weight
+      ResourceRecords:
+        - !GetAtt
+          - BCosminNetWebAppBeanstalkEnvironment
+          - EndpointURL
+Outputs: {}

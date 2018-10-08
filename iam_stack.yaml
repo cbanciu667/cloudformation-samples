@@ -23,6 +23,8 @@ Resources:
         - 'arn:aws:iam::aws:policy/AWSLambdaExecute'
       Path: /
       Policies: []
+
+
   VPNInstanceRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -94,6 +96,8 @@ Resources:
       Path: /
       Roles:
         - !Ref VPNInstanceRole
+
+
   WPInstanceRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -169,6 +173,8 @@ Resources:
       Path: /
       Roles:
         - !Ref WPInstanceRole
+
+
   CDeployInstanceRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -247,6 +253,196 @@ Resources:
       Path: /
       Roles:
         - !Ref CDeployInstanceRole
+
+  BeanstalkInstanceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+                - elasticbeanstalk.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
+        - 'arn:aws:iam::aws:policy/AWSElasticBeanstalkFullAccess'
+      Path: /
+      Policies:
+        - PolicyName: !Join
+            - ''
+            - - BeanstalkInstancePolicy
+              - !Ref 'AWS::StackName'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 's3:*Get*'
+                  - 's3:*List*'
+                  - 's3:*Put*'
+                Effect: Allow
+                Resource:
+                  - 'arn:aws:s3:::bcosmin-net-beanstalk/*'
+                  - 'arn:aws:s3:::bcosmin-net-logs/*'
+                  - 'arn:aws:s3:::bcosmin-net-beanstalk'
+                  - 'arn:aws:s3:::bcosmin-net-logs'
+              - Action:
+                  - 's3:*Get*'
+                  - 's3:*List*'
+                Effect: Allow
+                Resource:
+                  - 'arn:aws:s3:::bcosmin-net-config/*'
+                  - 'arn:aws:s3:::bcosmin-net-config'
+              - Action:
+                  - 'cloudwatch:PutMetricData'
+                Effect: Allow
+                Resource: '*'
+              - Action:
+                  - 'logs:PutLogEvents'
+                  - 'logs:CreateLogStream'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:DescribeLogStreams'
+                  - 'logs:DescribeLogGroups'
+                Resource:
+                  - '*'
+                Effect: Allow
+              - Action:
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeInstanceStatus'
+                  - 'ec2:GetConsoleOutput'
+                  - 'ec2:AssociateAddress'
+                  - 'ec2:DescribeAddresses'
+                  - 'ec2:DescribeSecurityGroups'
+                  - 'ec2:CreateSnapshot'
+                  - 'ec2:DeleteSnapshot'
+                  - 'ec2:DescribeVolumes'
+                  - 'ec2:DescribeSnapshots'
+                  - 'ec2:CreateTags'
+                  - 'elasticloadbalancing:*'
+                  - 'autoscaling:*'
+                Effect: Allow
+                Resource:
+                  - '*'
+  BeanstalkInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref BeanstalkInstanceRole
+
+
+  ECSServiceAutoScalingRole:
+      Type: AWS::IAM::Role
+      Properties:
+          AssumeRolePolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                  Action:
+                  - 'sts:AssumeRole'
+                  Effect: Allow
+                  Principal:
+                      Service:
+                      - application-autoscaling.amazonaws.com
+          Path: /
+          Policies:
+          - PolicyName: ecs-service-autoscaling
+          PolicyDocument:
+                Statement:
+                    Effect: Allow
+                    Resource: "*"
+                    Action:
+                    - application-autoscaling:*
+                    - cloudwatch:DescribeAlarms
+                    - cloudwatch:PutMetricAlarm
+                    - ecs:DescribeServices
+                    - ecs:UpdateService
+
+  ECSInstanceRole:
+      Type: AWS::IAM::Role
+      Properties:
+          Path: /
+          RoleName: !Sub ECSInstanceRole-${AWS::Region}
+          AssumeRolePolicyDocument: |
+              {
+                  "Statement": [{
+                      "Action": "sts:AssumeRole",
+                      "Effect": "Allow",
+                      "Principal": {
+                          "Service": "ec2.amazonaws.com"
+                      }
+                  }]
+              }
+          Policies:
+          - PolicyName: ecs-service
+          PolicyDocument: |
+              {
+                  "Statement": [{
+                      "Effect": "Allow",
+                      "Action": [
+                          "ecs:CreateCluster",
+                          "ecs:DeregisterContainerInstance",
+                          "ecs:DiscoverPollEndpoint",
+                          "ecs:Poll",
+                          "ecs:RegisterContainerInstance",
+                          "ecs:StartTelemetrySession",
+                          "ecs:Submit*",
+                          "logs:CreateLogStream",
+                          "logs:PutLogEvents",
+                          "ecr:BatchCheckLayerAvailability",
+                          "ecr:BatchGetImage",
+                          "ecr:GetDownloadUrlForLayer",
+                          "ecr:GetAuthorizationToken",
+                          "ssm:DescribeAssociation",
+                          "ssm:GetDeployablePatchSnapshotForInstance",
+                          "ssm:GetDocument",
+                          "ssm:GetManifest",
+                          "ssm:GetParameters",
+                          "ssm:ListAssociations",
+                          "ssm:ListInstanceAssociations",
+                          "ssm:PutInventory",
+                          "ssm:PutComplianceItems",
+                          "ssm:PutConfigurePackageResult",
+                          "ssm:UpdateAssociationStatus",
+                          "ssm:UpdateInstanceAssociationStatus",
+                          "ssm:UpdateInstanceInformation",
+                          "ec2messages:AcknowledgeMessage",
+                          "ec2messages:DeleteMessage",
+                          "ec2messages:FailMessage",
+                          "ec2messages:GetEndpoint",
+                          "ec2messages:GetMessages",
+                          "ec2messages:SendReply",
+                          "cloudwatch:PutMetricData",
+                          "ec2:DescribeInstanceStatus",
+                          "ds:CreateComputer",
+                          "ds:DescribeDirectories",
+                          "logs:CreateLogGroup",
+                          "logs:CreateLogStream",
+                          "logs:DescribeLogGroups",
+                          "logs:DescribeLogStreams",
+                          "logs:PutLogEvents",
+                          "s3:PutObject",
+                          "s3:GetObject",
+                          "s3:AbortMultipartUpload",
+                          "s3:ListMultipartUploadParts",
+                          "s3:ListBucket",
+                          "s3:ListBucketMultipartUploads",
+                          "dynamodb:*"
+                      ],
+                      "Resource": "*"
+                  }]
+              }
+  ECSInstanceProfile:
+      Type: AWS::IAM::InstanceProfile
+      Properties:
+          Path: /
+          Roles:
+              - !Ref ECSInstanceRole
+
+
 Outputs:
   VPNInstanceProfile:
     Description: VPN Instance Profile
@@ -299,6 +495,52 @@ Outputs:
     Value: !Ref CDeployInstanceRole
     Export:
       Name: !Sub '${AWS::StackName}-CDeployInstanceRole'
+  BeanstalkInstanceProfile:
+    Description: Beanstalk Instance Profile
+    Value: !Ref BeanstalkInstanceProfile
+    Export:
+      Name: !Sub '${AWS::StackName}-BeanstalkInstanceProfile'
+  BeanstalkInstanceRoleArn:
+    Description: Beanstalk Instance Role ARN
+    Value: !GetAtt
+      - BeanstalkInstanceRole
+      - Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BeanstalkInstanceRoleArn'
+  BeanstalkInstanceRole:
+    Description: Beanstalk Instance Role
+    Value: !Ref BeanstalkInstanceRole
+    Export:
+      Name: !Sub '${AWS::StackName}-BeanstalkInstanceRole'
+  ECSInstanceProfile:
+    Description: ECS Instance Profile
+    Value: !Ref ECSInstanceProfile
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSInstanceProfile'
+  ECSInstanceRoleArn:
+    Description: ECS Instance Role ARN
+    Value: !GetAtt
+      - ECSInstanceRole
+      - Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSInstanceRoleArn'
+  ECSInstanceRole:
+    Description: ECS Instance Role
+    Value: !Ref ECSInstanceRole
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSInstanceRole'
+  ECSServiceAutoScalingRoleArn:
+    Description: ECS Service Role
+    Value: !GetAtt
+      - ECSServiceAutoScalingRole
+      - Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSServiceAutoScalingRoleArn'
+  ECSServiceAutoScalingRole:
+    Description: ECS Service Role
+    Value: !Ref ECSServiceAutoScalingRole
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSServiceAutoScalingRole'
   LambdaRoleArn:
     Description: bcosmin.net Lambda Role ARN
     Value: !GetAtt
