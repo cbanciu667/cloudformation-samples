@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: bcosmin.net - IAM stack - v1.2.0
+Description: bcosmin.net - IAM stack - v1.2.2
 Parameters: {}
 Mappings: {}
 Metadata: {}
@@ -39,8 +39,6 @@ Resources:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AmazonVPCReadOnlyAccess'
-        - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
       Path: /
       Policies:
         - PolicyName: !Join
@@ -83,10 +81,20 @@ Resources:
                   - 'ec2:DescribeAddresses'
                   - 'ec2:DescribeSecurityGroups'
                   - 'ec2:CreateSnapshot'
-                  - 'ec2:DeleteSnapshot'
                   - 'ec2:DescribeVolumes'
                   - 'ec2:DescribeSnapshots'
                   - 'ec2:CreateTags'
+                Effect: Allow
+                Resource:
+                  - '*'
+              - Action:
+                  - 'servicediscovery:*'
+                  - 'route53:CreateHealthCheck'
+                  - 'route53:GetHostedZone'
+                  - 'route53:ChangeResourceRecordSets'
+                  - 'route53:List*'
+                  - 'route53:GetHealthCheck'
+                  - 'route53:UpdateHealthCheck'
                 Effect: Allow
                 Resource:
                   - '*'
@@ -110,9 +118,6 @@ Resources:
                 - ec2.amazonaws.com
             Action:
               - 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
       Path: /
       Policies:
         - PolicyName: !Join
@@ -132,13 +137,6 @@ Resources:
                   - 'arn:aws:s3:::bcosmin-net-logs/*'
                   - 'arn:aws:s3:::bcosmin-net-data'
                   - 'arn:aws:s3:::bcosmin-net-logs'
-              - Action:
-                  - 's3:*Get*'
-                  - 's3:*List*'
-                Effect: Allow
-                Resource:
-                  - 'arn:aws:s3:::bcosmin-net-config/*'
-                  - 'arn:aws:s3:::bcosmin-net-config'
               - Action:
                   - 'cloudwatch:PutMetricData'
                 Effect: Allow
@@ -160,10 +158,20 @@ Resources:
                   - 'ec2:DescribeAddresses'
                   - 'ec2:DescribeSecurityGroups'
                   - 'ec2:CreateSnapshot'
-                  - 'ec2:DeleteSnapshot'
                   - 'ec2:DescribeVolumes'
                   - 'ec2:DescribeSnapshots'
                   - 'ec2:CreateTags'
+                Effect: Allow
+                Resource:
+                  - '*'
+              - Action:
+                  - 'servicediscovery:*'
+                  - 'route53:CreateHealthCheck'
+                  - 'route53:GetHostedZone'
+                  - 'route53:ChangeResourceRecordSets'
+                  - 'route53:List*'
+                  - 'route53:GetHealthCheck'
+                  - 'route53:UpdateHealthCheck'
                 Effect: Allow
                 Resource:
                   - '*'
@@ -188,9 +196,6 @@ Resources:
                 - codedeploy.amazonaws.com
             Action:
               - 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
       Path: /
       Policies:
         - PolicyName: !Join
@@ -238,12 +243,22 @@ Resources:
                   - 'ec2:DescribeAddresses'
                   - 'ec2:DescribeSecurityGroups'
                   - 'ec2:CreateSnapshot'
-                  - 'ec2:DeleteSnapshot'
                   - 'ec2:DescribeVolumes'
                   - 'ec2:DescribeSnapshots'
                   - 'ec2:CreateTags'
                   - 'elasticloadbalancing:*'
                   - 'autoscaling:*'
+                Effect: Allow
+                Resource:
+                  - '*'
+              - Action:
+                  - 'servicediscovery:*'
+                  - 'route53:CreateHealthCheck'
+                  - 'route53:GetHostedZone'
+                  - 'route53:ChangeResourceRecordSets'
+                  - 'route53:List*'
+                  - 'route53:GetHealthCheck'
+                  - 'route53:UpdateHealthCheck'
                 Effect: Allow
                 Resource:
                   - '*'
@@ -268,8 +283,6 @@ Resources:
             Action:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
         - 'arn:aws:iam::aws:policy/AWSElasticBeanstalkFullAccess'
       Path: /
       Policies:
@@ -318,12 +331,22 @@ Resources:
                   - 'ec2:DescribeAddresses'
                   - 'ec2:DescribeSecurityGroups'
                   - 'ec2:CreateSnapshot'
-                  - 'ec2:DeleteSnapshot'
                   - 'ec2:DescribeVolumes'
                   - 'ec2:DescribeSnapshots'
                   - 'ec2:CreateTags'
                   - 'elasticloadbalancing:*'
                   - 'autoscaling:*'
+                Effect: Allow
+                Resource:
+                  - '*'
+              - Action:
+                  - 'servicediscovery:*'
+                  - 'route53:CreateHealthCheck'
+                  - 'route53:GetHostedZone'
+                  - 'route53:ChangeResourceRecordSets'
+                  - 'route53:List*'
+                  - 'route53:GetHealthCheck'
+                  - 'route53:UpdateHealthCheck'
                 Effect: Allow
                 Resource:
                   - '*'
@@ -393,19 +416,6 @@ Resources:
                 - ecr:BatchGetImage
                 - ecr:GetDownloadUrlForLayer
                 - ecr:GetAuthorizationToken
-                - ssm:DescribeAssociation
-                - ssm:GetDeployablePatchSnapshotForInstance
-                - ssm:GetDocument
-                - ssm:GetManifest
-                - ssm:GetParameters
-                - ssm:ListAssociations
-                - ssm:ListInstanceAssociations
-                - ssm:PutInventory
-                - ssm:PutComplianceItems
-                - ssm:PutConfigurePackageResult
-                - ssm:UpdateAssociationStatus
-                - ssm:UpdateInstanceAssociationStatus
-                - ssm:UpdateInstanceInformation
                 - ec2messages:AcknowledgeMessage
                 - ec2messages:DeleteMessage
                 - ec2messages:FailMessage
@@ -428,6 +438,13 @@ Resources:
                 - s3:ListBucket
                 - s3:ListBucketMultipartUploads
                 - dynamodb:*
+                - servicediscovery:*
+                - route53:CreateHealthCheck
+                - route53:GetHostedZone
+                - route53:ChangeResourceRecordSets
+                - route53:List*
+                - route53:GetHealthCheck
+                - route53:UpdateHealthCheck
               Resource:
                 - '*'
   ECSInstanceProfile:
