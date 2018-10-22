@@ -39,6 +39,7 @@ Resources:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AmazonVPCReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/CloudWatchAgentAdminPolicy'
       Path: /
       Policies:
         - PolicyName: !Join
@@ -60,19 +61,6 @@ Resources:
                   - 'arn:aws:s3:::bcosmin-net-logs'
                   - 'arn:aws:s3:::bcosmin-net-config/*'
                   - 'arn:aws:s3:::bcosmin-net-config'
-              - Action:
-                  - 'cloudwatch:PutMetricData'
-                Effect: Allow
-                Resource: '*'
-              - Action:
-                  - 'logs:PutLogEvents'
-                  - 'logs:CreateLogStream'
-                  - 'logs:CreateLogGroup'
-                  - 'logs:DescribeLogStreams'
-                  - 'logs:DescribeLogGroups'
-                Resource:
-                  - '*'
-                Effect: Allow
               - Action:
                   - 'ec2:DescribeInstances'
                   - 'ec2:DescribeInstanceStatus'
@@ -118,6 +106,8 @@ Resources:
                 - ec2.amazonaws.com
             Action:
               - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/CloudWatchAgentAdminPolicy'
       Path: /
       Policies:
         - PolicyName: !Join
@@ -196,6 +186,8 @@ Resources:
                 - codedeploy.amazonaws.com
             Action:
               - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/CloudWatchAgentAdminPolicy'
       Path: /
       Policies:
         - PolicyName: !Join
@@ -284,6 +276,7 @@ Resources:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AWSElasticBeanstalkFullAccess'
+        - 'arn:aws:iam::aws:policy/CloudWatchAgentAdminPolicy'
       Path: /
       Policies:
         - PolicyName: !Join
@@ -387,6 +380,8 @@ Resources:
   ECSInstanceRole:
     Type: AWS::IAM::Role
     Properties:
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/CloudWatchAgentAdminPolicy'
       Path: /
       RoleName: !Sub ECSInstanceRole-${AWS::Region}
       AssumeRolePolicyDocument:
