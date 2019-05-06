@@ -986,28 +986,6 @@ Resources:
               mode: '000400'
               owner: root
               group: root
-          /etc/awslogs/awslogs.conf:
-              content: !Sub |
-                [general]
-                state_file = /var/awslogs/state/agent-state
-
-                [/var/log/syslog]
-                file = /var/log/syslog
-                log_group_name = ${AWS::StackName}-/var/log/syslog
-                log_stream_name = ${AWS::StackName}-{instance_id}
-                datetime_format = %b %d %H:%M:%S
-
-                [/var/log/openvpn.log]
-                file = /var/log/openvpn.log
-                log_group_name = ${AWS::StackName}-/var/log/openvpn.log
-                log_stream_name = ${AWS::StackName}-{instance_id}
-                datetime_format = %b %d %H:%M:%S
-
-                [/var/log/chef/client.log]
-                file = /var/log/chef/client.log
-                log_group_name = ${AWS::StackName}-/var/log/chef/client.log
-                log_stream_name = ${AWS::StackName}-{instance_id}
-                datetime_format = %b %d %H:%M:%S
     Properties:
       InstanceType:
         Ref: MgmtInstanceAType
@@ -1034,6 +1012,7 @@ Resources:
             - "# Install prerequisites for the agents bellow. THIS USERDATA IS FOR UBUNTU 18.04 LTS ONLY\n"
             - "apt-get -y install python python-pip python-daemon ruby equivs\n"
             - "# Install and configure AWS CLI and AWS-CFN-BOOTSTRAP.\n"
+            - "pip install pip==18.0 -U\n"
             - "pip install -U setuptools\n"
             - "pip install awscli\n"
             - "wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-1.4-30.tar.gz\n"
@@ -1041,15 +1020,19 @@ Resources:
             - "cd aws-cfn-bootstrap-1.4\n"
             - "python setup.py install\n"
             - "# Make sure SSM AGENT is enabled and started.\n"
+            - " snap install amazon-ssm-agent --classic\n"
             - "systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service\n"
             - "systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service\n"
             - "systemctl status snap.amazon-ssm-agent.amazon-ssm-agent.service\n"
-            - "# Install AWS LOGS AGENT.\n"
-            - "wget https://s3.amazonaws.com/aws-cloudwatch/downloads/latest/awslogs-agent-setup.py\n"
-            - !Sub "python awslogs-agent-setup.py -n -r ${AWS::Region} -c s3://${ConfigS3Bucket}/logagent/${AWS::Region}\n"
-            - "systemctl enable awslogs\n"
-            - "systemctl start awslogs\n"
-            - "systemctl status awslogs\n"
+            - "# Install AWS CLOUDWATCH AGENT.\n"
+            - "wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb\n"
+            - "dpkg -i amazon-cloudwatch-agent.deb\n"
+            - !Sub "aws s3 cp s3://${ConfigS3Bucket}/cloudwatch/amazon-cloudwatch-agent.json /opt/aws/amazon-cloudwatch-agent/etc/\n"
+            - "/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a stop"
+            - "/opt/aws/amazon-cloudwatch-agent/bin/config-translator --input /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json --output /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.toml --mode ec2 --config /opt/aws/amazon-cloudwatch-agent/etc/common-config.toml"
+            - "/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a start"
+            - "aws s3 cp s3://bcosmin-net-config/ebs_snapshot.sh /root/"
+            - "export EDITOR=/bin/nano && (crontab -l ; echo "0 0 * * * /root/ebs_snapshot.sh")| crontab -"
             - "# Install the files and packages from the metadata. Configure services.\n"
             - 'cfn-init '
             - ' --configsets default '

@@ -128,6 +128,13 @@ Resources:
                   - 'arn:aws:s3:::bcosmin-net-data'
                   - 'arn:aws:s3:::bcosmin-net-logs'
               - Action:
+                  - 's3:*Get*'
+                  - 's3:*List*'
+                Effect: Allow
+                Resource:
+                  - 'arn:aws:s3:::bcosmin-net-config/*'
+                  - 'arn:aws:s3:::bcosmin-net-config'
+              - Action:
                   - 'cloudwatch:PutMetricData'
                 Effect: Allow
                 Resource: '*'
